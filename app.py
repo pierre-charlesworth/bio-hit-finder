@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Configure the Streamlit page
 st.set_page_config(
-    page_title="Plate Data Processing Platform",
+    page_title="BREAKthrough OM Screening Platform",
     page_icon="🧬",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -465,6 +465,19 @@ def main() -> None:
     # Load configuration
     config = load_config()
     
+    # BREAKthrough project header
+    st.markdown("""
+    <div style='text-align: center; padding: 1rem 0; background: linear-gradient(90deg, #1e3a8a, #3b82f6); border-radius: 10px; margin-bottom: 2rem;'>
+        <h1 style='color: white; margin: 0;'>🧬 BREAKthrough OM Screening Platform</h1>
+        <p style='color: #e0e7ff; margin: 0.5rem 0 0 0; font-size: 1.1rem;'>
+            Dual-Readout Discovery of Outer Membrane Permeabilizers
+        </p>
+        <p style='color: #c7d2fe; margin: 0.25rem 0 0 0; font-size: 0.9rem;'>
+            🇪🇺 Funded by the European Union | Novel Antimicrobial Strategies
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Add custom CSS for badges
     st.markdown("""
     <style>
@@ -511,8 +524,8 @@ def main() -> None:
         st.session_state.processing_summary = {}
     if 'hit_calling_results' not in st.session_state:
         st.session_state.hit_calling_results = {}
-    if 'multi_stage_enabled' not in st.session_state:
-        st.session_state.multi_stage_enabled = config.get('hit_calling', {}).get('multi_stage_enabled', False)
+    # Multi-stage hit calling is always enabled for dual-readout screening
+    st.session_state.multi_stage_enabled = True
     
     # Multi-sheet session state
     if 'sheet_data' not in st.session_state:
@@ -637,20 +650,9 @@ def main() -> None:
                     metadata = current_data['metadata']
                     st.success(f"✅ {metadata['total_wells']} wells processed successfully")
         
-        # Multi-stage hit calling toggle
-        st.subheader("🎯 Hit Calling Mode")
-        
-        multi_stage_enabled = st.checkbox(
-            "Enable Multi-Stage Hit Calling",
-            value=st.session_state.multi_stage_enabled,
-            help="Enable advanced dual-readout compound screening with reporter, vitality, and platform hit stages"
-        )
-        st.session_state.multi_stage_enabled = multi_stage_enabled
-        
-        if multi_stage_enabled:
-            st.info("🔬 Multi-stage mode: Reporter → Vitality → Platform hits")
-        else:
-            st.info("📊 Standard mode: Single-stage Z-score based hit calling")
+        # Hit calling is always multi-stage for dual-readout screening
+        st.subheader("🔬 Hit Calling Pipeline")
+        st.info("**Stage 1:** Reporter Hits → **Stage 2:** Vitality Hits → **Stage 3:** Platform Hits")
         
         # Configuration parameters
         st.subheader("⚙️ Parameters")
@@ -661,7 +663,7 @@ def main() -> None:
             max_value=1.0,
             value=config.get('processing', {}).get('viability_threshold', 0.3),
             step=0.1,
-            help="Wells with ATP < f × median(ATP) are flagged as low viability"
+            help="Wells with ATP < f × median(ATP) are flagged as low viability. Uses BacTiter luminescence assay - D-luciferin + cellular ATP → light via luciferase."
         )
         
         z_cutoff = st.number_input(
@@ -670,7 +672,7 @@ def main() -> None:
             max_value=5.0,
             value=config.get('processing', {}).get('z_score_cutoff', 2.0),
             step=0.1,
-            help="Minimum absolute Z-score to consider a well as a potential hit"
+            help="Minimum robust Z-score (MAD-based) to consider a potential hit. Formula: Z = (x - median) / (1.4826 × MAD), where MAD = median(|x - median(x)|). Resistant to outliers and non-normal distributions."
         )
         
         top_n = st.number_input(
@@ -685,90 +687,88 @@ def main() -> None:
         apply_b_scoring = st.checkbox(
             "Apply B-scoring",
             value=config.get('bscore', {}).get('enabled', False),
-            help="Apply median-polish row/column bias correction"
+            help="Apply median-polish row/column bias correction to remove spatial artifacts. Important for plates with edge effects or systematic row/column bias."
         )
         
-        # Hit calling configuration panel (only shown when multi-stage is enabled)
-        hit_calling_config = None
-        if multi_stage_enabled:
-            with st.expander("🎯 Hit Calling Thresholds", expanded=True):
-                st.write("**Reporter Hit Detection (Stage 1)**")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    z_threshold_lptA = st.number_input(
-                        "lptA Z-score threshold",
-                        min_value=1.0,
-                        max_value=5.0,
-                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
-                        step=0.1,
-                        help="Minimum Z-score for lptA reporter hits"
-                    )
-                
-                with col2:
-                    z_threshold_ldtD = st.number_input(
-                        "ldtD Z-score threshold",
-                        min_value=1.0,
-                        max_value=5.0,
-                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_ldtD', 2.0),
-                        step=0.1,
-                        help="Minimum Z-score for ldtD reporter hits"
-                    )
-                
-                st.write("**Vitality Hit Detection (Stage 2)**")
-                col3, col4, col5 = st.columns(3)
-                
-                with col3:
-                    tolc_max_threshold = st.slider(
+        # Hit calling configuration panel
+        with st.expander("🎯 Hit Calling Thresholds", expanded=True):
+            st.write("**Reporter Hit Detection (Stage 1)**")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                z_threshold_lptA = st.number_input(
+                    "lptA Z-score threshold",
+                    min_value=1.0,
+                    max_value=5.0,
+                    value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
+                    step=0.1,
+                    help="Minimum Z-score for lptA reporter hits. LptA (periplasmic bridge protein) is upregulated by σE during LPS transport stress and OM destabilization."
+                )
+            
+            with col2:
+                z_threshold_ldtD = st.number_input(
+                    "ldtD Z-score threshold",
+                    min_value=1.0,
+                    max_value=5.0,
+                    value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_ldtD', 2.0),
+                    step=0.1,
+                    help="Minimum Z-score for ldtD reporter hits. LdtD (L,D-transpeptidase) is Cpx-regulated and forms 3-3 crosslinks to compensate for OM structural weakness."
+                )
+            
+            st.write("**Vitality Hit Detection (Stage 2)**")
+            col3, col4, col5 = st.columns(3)
+            
+            with col3:
+                tolc_max_threshold = st.slider(
                         "tolC max %",
                         min_value=0.1,
                         max_value=1.0,
                         value=config.get('hit_calling', {}).get('vitality', {}).get('tolC_max_threshold', 0.8),
                         step=0.05,
-                        help="tolC percentage must be ≤ this value"
-                    )
-                
-                with col4:
-                    wt_min_threshold = st.slider(
-                        "WT min %",
-                        min_value=0.1,
-                        max_value=1.0,
-                        value=config.get('hit_calling', {}).get('vitality', {}).get('wt_min_threshold', 0.8),
-                        step=0.05,
-                        help="WT percentage must be > this value"
-                    )
-                
-                with col5:
-                    sa_min_threshold = st.slider(
-                        "SA min %",
-                        min_value=0.1,
-                        max_value=1.0,
-                        value=config.get('hit_calling', {}).get('vitality', {}).get('sa_min_threshold', 0.8),
-                        step=0.05,
-                        help="SA percentage must be > this value"
-                    )
-                
-                # Build hit calling configuration
-                hit_calling_config = {
-                    'hit_calling': {
-                        'multi_stage_enabled': True,
-                        'reporter': {
-                            'z_threshold_lptA': z_threshold_lptA,
-                            'z_threshold_ldtD': z_threshold_ldtD,
-                            'require_viability': True,
-                            'combine_mode': 'OR'
-                        },
-                        'vitality': {
-                            'tolC_max_threshold': tolc_max_threshold,
-                            'wt_min_threshold': wt_min_threshold,
-                            'sa_min_threshold': sa_min_threshold,
-                            'require_all_conditions': True
-                        },
-                        'platform': {
-                            'require_both_stages': True
-                        }
+                        help="E. coli ΔtolC max growth percentage (≤80%). ΔtolC has impaired OM and increased permeability, making it sensitive to OM-disrupting compounds."
+                )
+            
+            with col4:
+                wt_min_threshold = st.slider(
+                    "WT min %",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=config.get('hit_calling', {}).get('vitality', {}).get('wt_min_threshold', 0.8),
+                    step=0.05,
+                    help="E. coli WT min growth percentage (>80%). WT has intact OM providing natural resistance to OM-disrupting compounds."
+                )
+            
+            with col5:
+                sa_min_threshold = st.slider(
+                    "SA min %",
+                    min_value=0.1,
+                    max_value=1.0,
+                    value=config.get('hit_calling', {}).get('vitality', {}).get('sa_min_threshold', 0.8),
+                    step=0.05,
+                    help="S. aureus min growth percentage (>80%). Gram-positive control with no OM - should be unaffected by OM-disrupting compounds."
+                )
+            
+            # Build hit calling configuration
+            hit_calling_config = {
+                'hit_calling': {
+                    'multi_stage_enabled': True,
+                    'reporter': {
+                        'z_threshold_lptA': z_threshold_lptA,
+                        'z_threshold_ldtD': z_threshold_ldtD,
+                        'require_viability': True,
+                        'combine_mode': 'OR'
+                    },
+                    'vitality': {
+                        'tolC_max_threshold': tolc_max_threshold,
+                        'wt_min_threshold': wt_min_threshold,
+                        'sa_min_threshold': sa_min_threshold,
+                        'require_all_conditions': True
+                    },
+                    'platform': {
+                        'require_both_stages': True
                     }
                 }
+            }
         
         # Advanced settings
         with st.expander("🔧 Advanced Settings"):
@@ -802,8 +802,40 @@ def main() -> None:
             if not column_mapping:
                 column_mapping = None
         
-        # Demo data option
+        # Methodology and Scientific Background
         st.divider()
+        with st.expander("🧬 Scientific Methodology", expanded=False):
+            st.markdown("""
+            **BREAKthrough Dual-Readout Screening Platform**
+            
+            This platform implements a dual-reporter system for identifying compounds that disrupt the Gram-negative outer membrane (OM):
+            
+            **🔬 Reporter System:**
+            • **lptA**: σE-regulated LPS transport protein - detects LPS biogenesis stress
+            • **ldtD**: Cpx-regulated L,D-transpeptidase - detects peptidoglycan remodeling
+            
+            **⚡ Three-Strain Vitality Screen:**
+            • **E. coli WT**: Intact OM (resistant to OM disruptors)
+            • **E. coli ΔtolC**: Compromised OM (sensitive to OM disruptors) 
+            • **S. aureus**: Gram-positive control (no OM target)
+            
+            **📊 Statistical Analysis:**
+            • Robust Z-scores using MAD (outlier-resistant)
+            • Viability gating with ATP-based luminescence
+            • Multi-stage hit calling pipeline
+            
+            **📚 Learn More:**
+            • [Scientific Background](docs/user_guide/scientific_background.md)
+            • **Key Publications:**
+              - Silhavy et al. (2010) *Cold Spring Harb Perspect Biol*
+              - Yoon & Song (2024) *J Microbiol* 
+              - Chan et al. (2021) *ACS Infect Dis*
+            
+            **🏆 BREAKthrough Project**
+            *Funded by the European Union*
+            """)
+        
+        # Demo data option
         st.write("**Or try with demo data:**")
         use_demo_data = st.button("🎯 Load Demo Data", help="Load sample plate data to explore the platform")
         
@@ -827,10 +859,8 @@ def main() -> None:
                             plate_df = demo_df[demo_df['PlateID'] == plate_id].copy()
                             
                             # Choose processing method based on hit calling mode
-                            if multi_stage_enabled and hit_calling_config:
-                                processed_plate = processor.process_dual_readout_plate(plate_df, plate_id, hit_calling_config)
-                            else:
-                                processed_plate = processor.process_single_plate(plate_df, plate_id)
+                            # Always use dual-readout processing for compound screening
+                            processed_plate = processor.process_dual_readout_plate(plate_df, plate_id, hit_calling_config)
                             
                             processed_plates.append(processed_plate)
                         
@@ -871,7 +901,7 @@ def main() -> None:
                         # Multi-sheet processing
                         sheet_results = process_all_sheets_from_files(
                             files_data, viability_threshold, apply_b_scoring, 
-                            multi_stage_enabled, hit_calling_config, column_mapping
+                            True, hit_calling_config, column_mapping  # Always enable hit calling
                         )
                         
                         # Update session state
@@ -906,7 +936,7 @@ def main() -> None:
                         # Single-sheet processing (existing logic)
                         processed_df = process_uploaded_files(
                             files_data, sheet_selections, viability_threshold, 
-                            apply_b_scoring, multi_stage_enabled, hit_calling_config, column_mapping
+                            apply_b_scoring, True, hit_calling_config, column_mapping  # Always enable hit calling
                         )
                 
                 if processed_df is not None:
@@ -931,15 +961,15 @@ def main() -> None:
                     st.session_state.processing_summary = processor.get_processing_summary()
                     
                     # Calculate hit calling analysis if multi-stage mode is enabled
-                    if multi_stage_enabled and hit_calling_config:
-                        try:
-                            plate_data = {plate_id: processed_df[processed_df['PlateID'] == plate_id] 
-                                        for plate_id in processed_df['PlateID'].unique()}
-                            hit_analysis = analyze_multi_plate_hits(plate_data, hit_calling_config)
-                            st.session_state.hit_calling_results = hit_analysis
-                        except Exception as e:
-                            logger.warning(f"Hit calling analysis failed: {e}")
-                            st.session_state.hit_calling_results = {}
+                    # Always perform hit analysis for dual-readout screening
+                    try:
+                        plate_data = {plate_id: processed_df[processed_df['PlateID'] == plate_id] 
+                                    for plate_id in processed_df['PlateID'].unique()}
+                        hit_analysis = analyze_multi_plate_hits(plate_data, hit_calling_config)
+                        st.session_state.hit_calling_results = hit_analysis
+                    except Exception as e:
+                        logger.warning(f"Hit calling analysis failed: {e}")
+                        st.session_state.hit_calling_results = {}
                 else:
                     st.error("Failed to process data. Please check your files and try again.")
     
@@ -971,29 +1001,16 @@ def main() -> None:
             wells_count = metadata['total_wells']
             st.info(f"📋 **Currently viewing:** {sheet_name} ({wells_count:,} wells)")
     
-    # Main content tabs - add specialized tabs if multi-stage is enabled
-    if st.session_state.multi_stage_enabled:
-        summary_tab, hits_tab, reporter_hits_tab, vitality_hits_tab, hit_calling_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
-            "📊 Summary", 
-            "🎯 All Hits", 
-            "🧬 Reporter Hits",
-            "⚡ Vitality Hits", 
-            "🔬 Hit Calling",
-            "📈 Visualizations", 
-            "🔥 Heatmaps", 
-            "📋 QC Report"
-        ])
-    else:
-        summary_tab, hits_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
-            "📊 Summary", 
-            "🎯 Hits", 
-            "📈 Visualizations", 
-            "🔥 Heatmaps", 
-            "📋 QC Report"
-        ])
-        reporter_hits_tab = None
-        vitality_hits_tab = None
-        hit_calling_tab = None  # No specialized tabs in standard mode
+    # Main content tabs - dual-readout compound screening interface
+    summary_tab, reporter_hits_tab, vitality_hits_tab, hit_calling_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
+        "📊 Summary", 
+        "🧬 Reporter Hits",
+        "⚡ Vitality Hits", 
+        "🔬 Hit Calling",
+        "📈 Visualizations", 
+        "🔥 Heatmaps", 
+        "📋 QC Report"
+    ])
     
     # Get current sheet data
     current_data = get_current_sheet_data()
@@ -1043,7 +1060,7 @@ def main() -> None:
                 )
                 
             # Hit Calling Summary (if multi-stage mode is enabled and results are available)
-            if st.session_state.multi_stage_enabled and hit_calling_results and any(col in df.columns for col in ['reporter_hit', 'vitality_hit', 'platform_hit']):
+            if hit_calling_results and any(col in df.columns for col in ['reporter_hit', 'vitality_hit', 'platform_hit']):
                 st.subheader("Hit Calling Summary")
                 
                 hit_col1, hit_col2, hit_col3, hit_col4 = st.columns(4)
@@ -1125,6 +1142,74 @@ def main() -> None:
             else:
                 st.info("No edge effect analysis available. Process data first.")
             
+            # Quick reference card
+            with st.expander("📋 Quick Reference Card", expanded=False):
+                st.markdown("""
+                **⚡ At-a-Glance Summary**
+                
+                | **Measurement** | **Biological Meaning** | **Hit Criteria** |
+                |----------------|------------------------|------------------|
+                | **lptA Z-score** | LPS transport stress | ≥ 2.0 (+ viability) |
+                | **ldtD Z-score** | Peptidoglycan remodeling | ≥ 2.0 (+ viability) |
+                | **WT Growth** | Intact OM resistance | > 80% (normal) |
+                | **ΔtolC Growth** | Compromised OM sensitivity | ≤ 80% (inhibited) |
+                | **SA Growth** | Gram-positive control | > 80% (unaffected) |
+                
+                **🎯 Hit Classification:**
+                - **Reporter Hit:** lptA OR ldtD activated + viable
+                - **Vitality Hit:** WT>80% + ΔtolC≤80% + SA>80%
+                - **Platform Hit:** Reporter Hit AND Vitality Hit
+                
+                **📊 Expected Rates (from 880 extracts):**
+                - Reporter hits: ~8% | Vitality hits: ~6.5% | Platform hits: ~1%
+                
+                **⚠️ Key Quality Checks:**
+                - Viability: BT ≥ 30% of plate median
+                - Edge effects: Check spatial bias warnings  
+                - B-scores: Use when systematic row/column bias detected
+                
+                **📐 Key Formulas:**
+                """)
+                
+                st.latex(r"Z = \frac{x - \text{median}(X)}{1.4826 \times \text{MAD}(X)}")
+                st.caption("Robust Z-score calculation")
+                
+                st.latex(r"Ratio = \frac{BG}{BT} \quad \text{(Reporter Signal / ATP Viability)}")
+                st.caption("Normalized reporter activity")
+            
+            # Results interpretation guide
+            with st.expander("🧬 Results Interpretation Guide", expanded=False):
+                st.markdown("""
+                **Understanding Your Screening Results**
+                
+                **🔬 Reporter Hits (Stage 1):**
+                • **High lptA Z-scores** → LPS transport stress, OM integrity compromised
+                • **High ldtD Z-scores** → Peptidoglycan remodeling, structural compensation
+                • **Both reporters** → Dual evidence of OM disruption (strongest signal)
+                
+                **⚡ Vitality Hits (Stage 2):**
+                • **WT > 80%, ΔtolC ≤ 80%, SA > 80%** → OM-selective activity pattern
+                • **Selective toxicity** → Targets OM specifically, not general cytotoxicity
+                • **Gram-positive resistance** → Confirms OM as the target
+                
+                **🎯 Platform Hits (Stage 3):**
+                • **Biological + phenotypic evidence** → High-confidence OM permeabilizers
+                • **Adjuvant candidates** → Can sensitize bacteria to existing antibiotics
+                • **Expected hit rate: ~1%** → Rare, valuable compounds for combination therapy
+                
+                **📊 Quality Indicators:**
+                • **Z-scores ≥ 2.0** → Statistically significant above background noise
+                • **Viability gating** → Excludes low-ATP artifacts, focuses on viable responses  
+                • **Edge effects** → Spatial artifacts that may confound results
+                • **B-scores** → Corrected for systematic row/column bias when applied
+                
+                **🚨 Interpretation Caveats:**
+                • **False positives:** Some hits may be assay artifacts or non-specific effects
+                • **Dose-response needed:** Confirm activity across concentration ranges
+                • **Mechanism validation:** Additional assays required to confirm OM disruption
+                • **Cytotoxicity assessment:** Ensure selectivity vs mammalian cells
+                """)
+            
             # Download buttons
             st.subheader("Downloads")
             download_col1, download_col2 = st.columns(2)
@@ -1182,236 +1267,7 @@ def main() -> None:
             })
             st.dataframe(sample_data, width='stretch')
     
-    # Hits Tab  
-    with hits_tab:
-        st.header("Hits")
-        
-        if df is not None and len(df) > 0:
-            # Check if multi-stage hit calling data is available
-            has_multi_stage = any(col in df.columns for col in ['reporter_hit', 'vitality_hit', 'platform_hit'])
-            
-            # Controls
-            control_col1, control_col2, control_col3 = st.columns(3)
-            
-            with control_col1:
-                if has_multi_stage:
-                    hit_type = st.selectbox(
-                        "Hit Type:",
-                        ["Platform Hits", "Reporter Hits", "Vitality Hits", "Traditional Z-score"],
-                        help="Select which type of hits to display"
-                    )
-                else:
-                    hit_type = "Traditional Z-score"
-                    st.selectbox(
-                        "Hit Type:",
-                        ["Traditional Z-score"],
-                        disabled=True,
-                        help="Multi-stage hit calling not enabled or available"
-                    )
-            
-            with control_col2:
-                rank_by = st.selectbox(
-                    "Rank by:",
-                    ["Raw Z", "B-score"] if apply_b_scoring else ["Raw Z"],
-                    help="Metric to use for ranking hits"
-                )
-            
-            with control_col3:
-                display_top_n = st.number_input(
-                    "Display Top N:",
-                    min_value=10,
-                    max_value=min(1000, len(df)),
-                    value=min(top_n, len(df)),
-                    step=10
-                )
-            
-            # Filter and rank hits based on selected type
-            df_hits = df.copy()
-            
-            if hit_type == "Platform Hits" and 'platform_hit' in df.columns:
-                # Filter for platform hits
-                hits_df = df_hits[df_hits['platform_hit'] == True].copy()
-                hit_description = "platform hits (Reporter AND Vitality)"
-                
-            elif hit_type == "Reporter Hits" and 'reporter_hit' in df.columns:
-                # Filter for reporter hits
-                hits_df = df_hits[df_hits['reporter_hit'] == True].copy()
-                hit_description = "reporter hits (Z-score ≥ 2.0 AND viable)"
-                
-            elif hit_type == "Vitality Hits" and 'vitality_hit' in df.columns:
-                # Filter for vitality hits
-                hits_df = df_hits[df_hits['vitality_hit'] == True].copy()
-                hit_description = "vitality hits (growth pattern analysis)"
-                
-            else:
-                # Traditional Z-score based hit calling
-                # Determine ranking columns
-                if rank_by == "B-score" and apply_b_scoring:
-                    z_cols = ['B_Z_lptA', 'B_Z_ldtD']
-                    score_suffix = "B_"
-                else:
-                    z_cols = ['Z_lptA', 'Z_ldtD']
-                    score_suffix = ""
-                
-                # Calculate max absolute Z-score for ranking
-                if all(col in df_hits.columns for col in z_cols):
-                    df_hits['max_abs_z'] = df_hits[z_cols].abs().max(axis=1)
-                    hits_df = df_hits[df_hits['max_abs_z'] >= z_cutoff].copy()
-                    hit_description = f"potential hits (|Z| ≥ {z_cutoff})"
-                else:
-                    hits_df = df_hits.head(0)  # Empty DataFrame
-                    hit_description = "hits (missing Z-score columns)"
-            
-            # Rank hits by Z-score if available
-            if len(hits_df) > 0:
-                # Add ranking column for sorting
-                if rank_by == "B-score" and apply_b_scoring and all(col in hits_df.columns for col in ['B_Z_lptA', 'B_Z_ldtD']):
-                    hits_df['rank_score'] = hits_df[['B_Z_lptA', 'B_Z_ldtD']].abs().max(axis=1)
-                elif all(col in hits_df.columns for col in ['Z_lptA', 'Z_ldtD']):
-                    hits_df['rank_score'] = hits_df[['Z_lptA', 'Z_ldtD']].abs().max(axis=1)
-                else:
-                    hits_df['rank_score'] = 0
-                
-                hits_df = hits_df.sort_values('rank_score', ascending=False).head(display_top_n)
-            
-            # Display results
-            st.write(f"**Found {len(hits_df)} {hit_description}**")
-            
-            # Show stage progression for multi-stage hits
-            if has_multi_stage and len(df) > 0:
-                prog_col1, prog_col2, prog_col3, prog_col4 = st.columns(4)
-                
-                with prog_col1:
-                    total_wells = len(df)
-                    st.metric("Total Wells", f"{total_wells:,}")
-                    
-                with prog_col2:
-                    reporter_hits = df['reporter_hit'].sum() if 'reporter_hit' in df.columns else 0
-                    st.metric("Reporter Hits", f"{reporter_hits:,}")
-                    
-                with prog_col3:
-                    vitality_hits = df['vitality_hit'].sum() if 'vitality_hit' in df.columns else 0
-                    st.metric("Vitality Hits", f"{vitality_hits:,}")
-                    
-                with prog_col4:
-                    platform_hits = df['platform_hit'].sum() if 'platform_hit' in df.columns else 0
-                    st.metric("Platform Hits", f"{platform_hits:,}")
-            
-            if len(hits_df) > 0:
-                
-                # Prepare display columns based on hit type and available data
-                display_cols = []
-                
-                # Essential columns with fallbacks
-                essential_cols = [
-                    ('PlateID', ['PlateID', 'Plate_ID', 'plate_id']),
-                    ('Well', ['Well', 'WellID', 'well_id']),
-                    ('Ratio_lptA', ['Ratio_lptA']),
-                    ('Ratio_ldtD', ['Ratio_ldtD'])
-                ]
-                
-                for col_name, alternatives in essential_cols:
-                    for alt in alternatives:
-                        if alt in hits_df.columns:
-                            display_cols.append(alt)
-                            break
-                    else:
-                        # If Well column is missing, try to construct from Row/Col
-                        if col_name == 'Well' and 'Row' in hits_df.columns and 'Col' in hits_df.columns:
-                            display_cols.extend(['Row', 'Col'])
-                        elif col_name in ['Ratio_lptA', 'Ratio_ldtD', 'PlateID']:
-                            st.warning(f"Missing required column: {col_name}")
-                
-                # Add Z-score columns
-                if hit_type != "Traditional Z-score":
-                    # For multi-stage hits, show both raw and B-scores if available
-                    z_cols = ['Z_lptA', 'Z_ldtD']
-                    if apply_b_scoring:
-                        z_cols.extend(['B_Z_lptA', 'B_Z_ldtD'])
-                else:
-                    # For traditional hits, use the selected ranking columns
-                    if rank_by == "B-score" and apply_b_scoring:
-                        z_cols = ['B_Z_lptA', 'B_Z_ldtD']
-                    else:
-                        z_cols = ['Z_lptA', 'Z_ldtD']
-                
-                display_cols.extend(z_cols)
-                
-                # Add multi-stage hit calling columns if available
-                hit_calling_cols = []
-                if has_multi_stage:
-                    potential_hit_cols = ['reporter_hit', 'vitality_hit', 'platform_hit']
-                    hit_calling_cols = [col for col in potential_hit_cols if col in hits_df.columns]
-                    display_cols.extend(hit_calling_cols)
-                
-                # Add OD percentage columns for vitality analysis
-                if hit_type in ["Vitality Hits", "Platform Hits"] or has_multi_stage:
-                    od_pct_cols = [col for col in ['WT%', 'tolC%', 'SA%'] if col in hits_df.columns]
-                    display_cols.extend(od_pct_cols)
-                
-                # Add viability flags if available
-                viability_cols = [col for col in ['viable_lptA', 'viable_ldtD', 'viability_ok_lptA', 'viability_ok_ldtD'] if col in hits_df.columns]
-                display_cols.extend(viability_cols)
-                
-                # Filter to only existing columns and remove duplicates
-                existing_display_cols = list(dict.fromkeys([col for col in display_cols if col in hits_df.columns]))
-                
-                if not existing_display_cols:
-                    st.error("Cannot display hits: required columns are missing from processed data")
-                else:
-                    # Format the dataframe for display
-                    hits_display = hits_df[existing_display_cols].copy()
-                    
-                    # Drop the ranking score column if it exists (used only for sorting)
-                    if 'rank_score' in hits_display.columns:
-                        hits_display = hits_display.drop(columns=['rank_score'])
-                    
-                    # Round numeric columns
-                    numeric_cols = ['Ratio_lptA', 'Ratio_ldtD'] + [col for col in z_cols if col in hits_display.columns]
-                    if has_multi_stage:
-                        numeric_cols.extend([col for col in ['WT%', 'tolC%', 'SA%'] if col in hits_display.columns])
-                    
-                    for col in numeric_cols:
-                        if col in hits_display.columns and pd.api.types.is_numeric_dtype(hits_display[col]):
-                            if col in ['WT%', 'tolC%', 'SA%']:
-                                hits_display[col] = (hits_display[col] * 100).round(1)  # Convert to percentage
-                            else:
-                                hits_display[col] = hits_display[col].round(3)
-                    
-                    st.dataframe(hits_display, width='stretch', height=400)
-                    
-                    # Download top hits
-                    hits_csv = hits_display.to_csv(index=False)
-                    hit_type_filename = hit_type.lower().replace(" ", "_")
-                    st.download_button(
-                        f"📥 Download {hit_type} CSV ({len(hits_display)} hits)",
-                        hits_csv,
-                        file_name=f"{hit_type_filename}_hits_{len(hits_display)}.csv",
-                        mime="text/csv"
-                    )
-                
-            elif hit_type == "Traditional Z-score":
-                st.error(f"Required Z-score columns not found in processed data.")
-            else:
-                st.info(f"No {hit_type.lower()} found with current criteria.")
-        else:
-            st.info("👆 Process plate data first to identify potential hits.")
-            
-            if st.session_state.multi_stage_enabled:
-                st.subheader("Multi-Stage Hit Calling Workflow")
-                st.write("**Stage 1: Reporter Hits**")
-                st.write("- Z-score ≥ 2.0 for lptA OR ldtD")
-                st.write("- Must pass viability gate (ATP levels)")
-                st.write("")
-                st.write("**Stage 2: Vitality Hits**")
-                st.write("- Growth pattern analysis based on OD measurements")
-                st.write("- tolC% ≤ 80%, WT% > 80%, SA% > 80%")
-                st.write("")
-                st.write("**Stage 3: Platform Hits**")
-                st.write("- Compounds that pass BOTH Reporter AND Vitality criteria")
-                st.write("- Final candidates for follow-up studies")
-    
-    # Reporter Hits Tab - only show when multi-stage enabled
+    # Reporter Hits Tab
     if reporter_hits_tab is not None:
         with reporter_hits_tab:
             st.header("🧬 Reporter Hits")
@@ -1686,12 +1542,22 @@ def main() -> None:
     # Hit Calling Tab - only show when multi-stage enabled
     if hit_calling_tab is not None:
         with hit_calling_tab:
-            st.header("Hit Calling Analysis")
+            st.header("🔬 Multi-Stage Hit Calling Pipeline")
             
-            if df is not None and len(df) > 0 and st.session_state.multi_stage_enabled:
+            # Add biological context explanation
+            st.markdown("""
+            **Scientific Rationale:** This three-stage pipeline identifies outer membrane (OM) permeabilizing compounds 
+            through dual biological evidence and selective growth inhibition patterns.
+            
+            **🧬 Stage 1: Reporter Hits** - Compounds triggering OM stress response  
+            **⚡ Stage 2: Vitality Hits** - Compounds with OM-selective growth inhibition  
+            **🎯 Stage 3: Platform Hits** - High-confidence OM permeabilizers (both stages)
+            """)
+            
+            if df is not None and len(df) > 0:
                 # Show hit calling analysis and statistics
                 if hit_calling_results:
-                    st.subheader("Hit Calling Summary")
+                    st.subheader("Pipeline Results")
                     
                     # Display summary statistics
                     summary_stats = hit_calling_results.get('cross_plate_summary', {})
@@ -1727,7 +1593,8 @@ def main() -> None:
                         platform_hits = summary_stats.get('total_platform_hits', 0)
                         
                         # Use Sankey as the primary visualization
-                        st.subheader("Hit Calling Pipeline Flow")
+                        st.subheader("🔬 Biological Hit Calling Flow")
+                        st.caption("Flow shows compound filtering through biological evidence requirements")
                         
                         # Create Sankey flow diagram
                         fig_sankey = go.Figure(data=[go.Sankey(
@@ -1753,22 +1620,23 @@ def main() -> None:
                         )])
                         
                         fig_sankey.update_layout(
-                            title="Multi-Stage Hit Calling Flow",
+                            title="OM Permeabilizer Discovery Pipeline",
                             height=400,
                             margin=dict(l=50, r=50, t=60, b=50)
                         )
                         st.plotly_chart(fig_sankey, use_container_width=True)
                     
                     # Hit analysis report
-                    st.subheader("Analysis Report")
+                    st.subheader("📋 Biological Analysis Report")
+                    st.caption("Detailed breakdown of hit calling results with biological interpretation")
                     from analytics.hit_calling import format_hit_calling_report
                     report_text = format_hit_calling_report(hit_calling_results)
                     st.text_area("Hit Calling Report", report_text, height=300)
                     
                 else:
-                    st.info("Hit calling analysis will appear here after processing data with multi-stage mode enabled.")
+                    st.info("🔬 Hit calling analysis will appear here after processing data. The pipeline will identify compounds that disrupt the outer membrane through biological reporter activation and selective growth inhibition.")
             else:
-                st.info("Enable multi-stage hit calling mode and process data to see hit calling analysis.")
+                st.info("📊 Process plate data to see multi-stage hit calling analysis for outer membrane permeabilizer discovery.")
     
     # Visualizations Tab
     with viz_tab:
@@ -1921,6 +1789,91 @@ def main() -> None:
         if df is not None and len(df) > 0:
             st.write("**Quality Control Report Generation**")
             
+            # Quick reference formulas
+            with st.expander("📐 Calculation Formulas Reference", expanded=False):
+                st.markdown("**Core Calculations:**")
+                
+                st.markdown("• **Reporter Ratios:** (β-galactosidase signal / ATP viability)")
+                st.latex(r"Ratio_{lptA} = \frac{BG_{lptA}}{BT_{lptA}}, \quad Ratio_{ldtD} = \frac{BG_{ldtD}}{BT_{ldtD}}")
+                
+                st.markdown("• **Robust Z-scores:** (MAD-based, outlier-resistant)")
+                st.latex(r"Z = \frac{x - \text{median}(X)}{1.4826 \times \text{MAD}(X)}")
+                
+                st.markdown("• **Viability Gating:** (ATP-based cell viability filter)")
+                st.latex(r"viable = BT \geq f \times \text{median}(BT_{plate}), \quad f = 0.3")
+                
+                st.markdown("• **OD Normalization:** (plate-relative growth)")
+                st.latex(r"OD_{norm} = \frac{OD}{\text{median}(OD_{plate})}")
+                
+                st.markdown("**Hit Calling Logic:**")
+                
+                st.markdown("• **Reporter Hit:**")
+                st.latex(r"reporter\_hit = (Z_{lptA} \geq 2.0 \lor Z_{ldtD} \geq 2.0) \land viable")
+                
+                st.markdown("• **Vitality Hit:**")
+                st.latex(r"vitality\_hit = (WT > 0.8) \land (\Delta tolC \leq 0.8) \land (SA > 0.8)")
+                
+                st.markdown("• **Platform Hit:**")
+                st.latex(r"platform\_hit = reporter\_hit \land vitality\_hit")
+                
+                st.markdown("**B-score Correction (when enabled):**")
+                
+                st.markdown("• Median-polish iteration:")
+                st.latex(r"X'_{ij} = X_{ij} - \text{median}(row_i), \quad X''_{ij} = X'_{ij} - \text{median}(col_j)")
+                
+                st.markdown("• Robust scaling:")
+                st.latex(r"B = \frac{X''}{1.4826 \times \text{MAD}(X'')}")
+                
+                st.markdown("**Statistical Definitions:**")
+                
+                st.markdown("• **MAD (Median Absolute Deviation):**")
+                st.latex(r"MAD = \text{median}(|X_i - \text{median}(X)|)")
+                
+                st.markdown("• **Consistency Factor:**")
+                st.latex(r"1.4826 \approx \Phi^{-1}(0.75)")
+                st.caption("Inverse normal CDF at 75th percentile for normal distribution consistency")
+                st.markdown("• **Robustness:** Methods resist up to 50% outlier contamination")
+            
+            # Publication references section
+            with st.expander("📚 Key Publications & References", expanded=False):
+                st.markdown("""
+                **Primary Literature:**
+                
+                **🔬 Outer Membrane Biology & LPS Transport:**
+                1. **Silhavy, T.J., Kahne, D. and Walker, S.** (2010) 'The Bacterial Cell Envelope', *Cold Spring Harbor Perspectives in Biology*, 2(5), p. a000414.
+                   - Foundational review of Gram-negative cell envelope structure and function
+                
+                2. **Yoon, Y., Song, S.** (2024) 'Structural Insights into the Lipopolysaccharide Transport (Lpt) System as a Novel Antibiotic Target', *J Microbiol.* 62, 261–275.
+                   - Recent structural biology of LPS transport machinery
+                
+                3. **Martorana, A.M. et al.** (2011) 'Complex transcriptional organization regulates an Escherichia coli locus implicated in lipopolysaccharide biogenesis' *Research in Microbiology*, 162(5), pp. 470–482.
+                   - lptA gene regulation and σE stress response pathway
+                
+                **⚡ Peptidoglycan Remodeling & Stress Response:**
+                4. **Morè, N. et al.** (2019) 'Peptidoglycan Remodeling Enables Escherichia coli To Survive Severe Outer Membrane Assembly Defect' *mBio*, 10(1), p. 10.1128/mbio.02729-18.
+                   - ldtD function and 3-3 crosslink formation during OM stress
+                
+                **🎯 OM Permeabilization & Antibiotic Sensitization:**
+                5. **Chan, L.W. et al.** (2021) 'Selective Permeabilization of Gram-Negative Bacterial Membranes Using Multivalent Peptide Constructs for Antibiotic Sensitization' *ACS Infectious Diseases*, 7(4), p. 721.
+                   - Proof-of-concept for OM permeabilizer + antibiotic combination therapy
+                
+                6. **Zhu, S. et al.** (2024) 'The inactivation of tolC sensitizes Escherichia coli to perturbations in lipopolysaccharide transport,' *iScience*, 27(5), p. 109592.
+                   - ΔtolC strain hypersensitivity to OM perturbation
+                
+                **📊 Statistical Methods:**
+                7. **Tukey, J.W.** (1977) 'Exploratory Data Analysis', Addison-Wesley.
+                   - Median polish algorithm for B-score calculation
+                
+                8. **Rousseeuw, P.J. and Croux, C.** (1993) 'Alternatives to the median absolute deviation', *Journal of the American Statistical Association*, 88, pp. 1273-1283.
+                   - Robust statistics and MAD-based scaling
+                
+                **🏆 Funding Acknowledgment:**
+                - This work is supported by the **BREAKthrough project**, funded by the European Union
+                - Grant focus: Novel antimicrobial strategies against Gram-negative pathogens
+                """)
+            
+            st.divider()
+            
             # Report options
             report_col1, report_col2 = st.columns(2)
             
@@ -1988,22 +1941,72 @@ def main() -> None:
                                 report_sections.append(f"- Column correlation: {result.col_correlation:.3f}")
                             report_sections.append("")
                     
-                    # Formulas
+                    # Complete Scientific Formulas
                     if include_formulas:
-                        report_sections.append("## Calculation Formulas")
-                        report_sections.append("### Ratios")
+                        report_sections.append("## Scientific Calculation Formulas")
+                        
+                        report_sections.append("### 1. Reporter Signal Processing")
+                        report_sections.append("**BetaGlo/BacTiter Ratios (Normalized Reporter Activity):**")
                         report_sections.append("- Ratio_lptA = BG_lptA / BT_lptA")
                         report_sections.append("- Ratio_ldtD = BG_ldtD / BT_ldtD")
                         report_sections.append("")
-                        report_sections.append("### Robust Z-scores")
+                        report_sections.append("**Biochemical Basis:**")
+                        report_sections.append("- BG (BetaGlo): β-galactosidase activity from lacZ reporter")
+                        report_sections.append("- BT (BacTiter): ATP-dependent luciferase activity (viability)")
+                        report_sections.append("- Ratio normalizes reporter signal to viable cell count")
+                        report_sections.append("")
+                        
+                        report_sections.append("### 2. Growth Measurements")
+                        report_sections.append("**OD Normalization (Plate-Relative Growth):**")
+                        report_sections.append("- OD_WT_norm = OD_WT / median(OD_WT_plate)")
+                        report_sections.append("- OD_tolC_norm = OD_tolC / median(OD_tolC_plate)")
+                        report_sections.append("- OD_SA_norm = OD_SA / median(OD_SA_plate)")
+                        report_sections.append("")
+                        
+                        report_sections.append("### 3. Robust Statistical Scoring")
+                        report_sections.append("**Robust Z-scores (MAD-based, outlier-resistant):**")
                         report_sections.append("- Z = (value - median) / (1.4826 × MAD)")
                         report_sections.append("- MAD = median(|values - median(values)|)")
+                        report_sections.append("- 1.4826 = consistency factor for normal distributions")
                         report_sections.append("")
+                        report_sections.append("**Statistical Advantages:**")
+                        report_sections.append("- Resistant to outliers (up to 50% contamination)")
+                        report_sections.append("- No assumption of normal distribution")
+                        report_sections.append("- More stable than mean/standard deviation")
+                        report_sections.append("")
+                        
                         if apply_b_scoring:
-                            report_sections.append("### B-scores")
-                            report_sections.append("- Median-polish row/column bias correction")
-                            report_sections.append("- Followed by robust scaling using MAD")
+                            report_sections.append("### 4. B-score Spatial Correction")
+                            report_sections.append("**Median Polish Algorithm:**")
+                            report_sections.append("1. Subtract row medians: X'ᵢⱼ = Xᵢⱼ - median(row_i)")
+                            report_sections.append("2. Subtract column medians: X''ᵢⱼ = X'ᵢⱼ - median(col_j)")
+                            report_sections.append("3. Iterate until convergence (tolerance = 1e-6)")
+                            report_sections.append("4. Apply robust scaling: B = X'' / (1.4826 × MAD(X''))")
                             report_sections.append("")
+                        
+                        report_sections.append("### 5. Viability Gating")
+                        report_sections.append("**ATP-based Viability Filter:**")
+                        report_sections.append(f"- viability_ok = BT ≥ {viability_threshold} × median(BT_plate)")
+                        report_sections.append("- Excludes wells with insufficient ATP for reliable measurements")
+                        report_sections.append("- Based on D-luciferin + ATP → oxyluciferin + light reaction")
+                        report_sections.append("")
+                        
+                        report_sections.append("### 6. Multi-Stage Hit Calling")
+                        report_sections.append("**Stage 1 - Reporter Hits:**")
+                        report_sections.append(f"- lptA_hit = (Z_lptA ≥ {z_cutoff}) AND viability_ok")
+                        report_sections.append(f"- ldtD_hit = (Z_ldtD ≥ {z_cutoff}) AND viability_ok")
+                        report_sections.append("- reporter_hit = lptA_hit OR ldtD_hit")
+                        report_sections.append("")
+                        report_sections.append("**Stage 2 - Vitality Hits:**")
+                        report_sections.append("- WT_resist = OD_WT_norm > 0.8 (intact OM protection)")
+                        report_sections.append("- tolC_sensitive = OD_tolC_norm ≤ 0.8 (compromised OM vulnerability)")
+                        report_sections.append("- SA_unaffected = OD_SA_norm > 0.8 (no OM target)")
+                        report_sections.append("- vitality_hit = WT_resist AND tolC_sensitive AND SA_unaffected")
+                        report_sections.append("")
+                        report_sections.append("**Stage 3 - Platform Hits:**")
+                        report_sections.append("- platform_hit = reporter_hit AND vitality_hit")
+                        report_sections.append("- High-confidence OM permeabilizers with dual evidence")
+                        report_sections.append("")
                     
                     # Methodology
                     if include_methodology:
@@ -2031,6 +2034,22 @@ def main() -> None:
                     st.success("Report generated successfully!")
         else:
             st.info("👆 Process plate data first to generate QC report.")
+    
+    # BREAKthrough project footer
+    st.markdown("""
+    ---
+    <div style='text-align: center; padding: 2rem 0 1rem 0; color: #6b7280;'>
+        <p style='margin: 0; font-size: 0.9rem;'>
+            🏆 <strong>BREAKthrough Project</strong> - Novel Antimicrobial Strategies Against Gram-Negative Pathogens
+        </p>
+        <p style='margin: 0.5rem 0 0 0; font-size: 0.8rem;'>
+            🇪🇺 Funded by the European Union | 🧬 Advancing Combination Therapy Research
+        </p>
+        <p style='margin: 0.5rem 0 0 0; font-size: 0.7rem; color: #9ca3af;'>
+            Platform for identifying outer membrane permeabilizers as antibiotic adjuvants
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 if __name__ == "__main__":

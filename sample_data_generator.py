@@ -1,7 +1,15 @@
 """Sample data generator for bio-hit-finder platform demonstration.
 
-This module creates realistic sample plate data that can be used to test
-and demonstrate the platform functionality without requiring real experimental data.
+This module creates realistic sample plate data based on the BREAKthrough dual-readout 
+screening platform for outer membrane (OM) permeabilization discovery. The generated 
+data reflects actual screening statistics from 880 crude microbial extracts:
+
+- Reporter hits (Stage 1): ~8% showing lptA/ldtD stress response activation
+- Vitality hits (Stage 2): ~6.5% with OM-selective growth inhibition patterns  
+- Platform hits (Stage 3): ~1% high-confidence OM permeabilizers (both stages)
+
+Biological accuracy includes realistic signal ranges, edge effects, viability issues,
+and the correct directionality of reporter responses (upregulation during OM stress).
 """
 
 import pandas as pd
@@ -20,19 +28,25 @@ def generate_sample_plate(
     add_noise: bool = True,
     viability_issues: float = 0.05
 ) -> pd.DataFrame:
-    """Generate a single sample plate with realistic biological data patterns.
+    """Generate a single sample plate with realistic OM permeabilization screening patterns.
+    
+    Simulates the BREAKthrough dual-readout screening platform with:
+    - Reporter hits: ~8% (lptA/ldtD stress response activation)  
+    - Vitality hits: ~6.5% (OM-selective growth inhibition)
+    - Platform hits: ~1% (intersection of reporter and vitality)
+    - Realistic signal ranges and biological variability
     
     Args:
         plate_id: Identifier for the plate
         n_rows: Number of rows (default 8 for 96-well)
         n_cols: Number of columns (default 12 for 96-well)
-        add_hits: Whether to include potential hit wells
+        add_hits: Whether to include potential OM permeabilizer hits
         add_edge_effects: Whether to simulate edge effects
-        add_noise: Whether to add realistic noise
+        add_noise: Whether to add realistic measurement noise
         viability_issues: Fraction of wells with viability problems
         
     Returns:
-        DataFrame with sample plate data
+        DataFrame with sample plate data matching expected screening patterns
     """
     np.random.seed(hash(plate_id) % 2**32)  # Reproducible but plate-specific
     
@@ -81,30 +95,58 @@ def generate_sample_plate(
                 base_bg_lptA[i] *= corner_factor
                 base_bg_ldtD[i] *= corner_factor
     
-    # Add potential hits if requested
+    # Add potential hits if requested - realistic OM permeabilization patterns
     if add_hits:
-        # 5-10 strong hits
-        n_strong_hits = random.randint(5, 10)
-        hit_indices = np.random.choice(n_wells, n_strong_hits, replace=False)
+        # Stage 1: Reporter hits - compounds triggering stress response
+        # Based on 880 extracts screening: ~8% reporter hits (70/880)
+        n_reporter_hits = int(0.08 * n_wells)  # ~8% hit rate
+        reporter_indices = np.random.choice(n_wells, n_reporter_hits, replace=False)
         
-        for idx in hit_indices:
-            # Strong inhibition: BG signal drops significantly
-            hit_strength = np.random.uniform(0.2, 0.5)  # 20-50% of normal
-            base_bg_lptA[idx] *= hit_strength
-            base_bg_ldtD[idx] *= hit_strength
+        for idx in reporter_indices:
+            # Reporter hits: INCREASED BG signal (stress response activation)
+            # lptA and ldtD are UPREGULATED during OM stress
+            lptA_activation = np.random.uniform(2.0, 5.0)  # 2-5x normal signal
+            ldtD_activation = np.random.uniform(1.5, 4.0)  # 1.5-4x normal signal
+            
+            # Not all hits activate both reporters equally
+            if np.random.random() < 0.6:  # 60% activate lptA stronger
+                base_bg_lptA[idx] *= lptA_activation
+                base_bg_ldtD[idx] *= np.random.uniform(1.2, 2.0)  # Moderate ldtD
+            elif np.random.random() < 0.7:  # 30% activate ldtD stronger  
+                base_bg_ldtD[idx] *= ldtD_activation
+                base_bg_lptA[idx] *= np.random.uniform(1.2, 2.0)  # Moderate lptA
+            else:  # 10% activate both strongly
+                base_bg_lptA[idx] *= lptA_activation
+                base_bg_ldtD[idx] *= ldtD_activation
         
-        # 10-20 moderate hits
-        n_moderate_hits = random.randint(10, 20)
-        moderate_indices = np.random.choice(
-            [i for i in range(n_wells) if i not in hit_indices], 
-            n_moderate_hits, 
-            replace=False
-        )
+        # Stage 2: Vitality hits - OM-selective growth inhibition pattern
+        # Based on screening: ~6.5% vitality hits (57/880)
+        n_vitality_hits = int(0.065 * n_wells)  # ~6.5% hit rate
+        vitality_indices = np.random.choice(n_wells, n_vitality_hits, replace=False)
         
-        for idx in moderate_indices:
-            hit_strength = np.random.uniform(0.6, 0.8)  # 60-80% of normal
-            base_bg_lptA[idx] *= hit_strength
-            base_bg_ldtD[idx] *= hit_strength
+        for idx in vitality_indices:
+            # OM-selective pattern: WT resistant, ΔtolC sensitive, SA unaffected
+            wt_growth = np.random.uniform(0.85, 1.2)    # >80% growth (resistant)
+            tolC_growth = np.random.uniform(0.3, 0.8)   # ≤80% growth (sensitive)  
+            sa_growth = np.random.uniform(0.85, 1.1)    # >80% growth (unaffected)
+            
+            base_od_wt[idx] *= wt_growth
+            base_od_tolc[idx] *= tolC_growth
+            base_od_sa[idx] *= sa_growth
+        
+        # Stage 3: Platform hits - overlap of reporter and vitality hits
+        # Based on screening: ~1% platform hits (9/880) - the intersection
+        platform_indices = list(set(reporter_indices) & set(vitality_indices))
+        
+        # Ensure we have some platform hits by forcing overlap
+        if len(platform_indices) < int(0.01 * n_wells):
+            needed = int(0.01 * n_wells) - len(platform_indices)
+            additional_indices = np.random.choice(reporter_indices, min(needed, len(reporter_indices)), replace=False)
+            for idx in additional_indices:
+                # Apply vitality pattern to these reporter hits
+                base_od_wt[idx] *= np.random.uniform(0.85, 1.2)
+                base_od_tolc[idx] *= np.random.uniform(0.3, 0.8)
+                base_od_sa[idx] *= np.random.uniform(0.85, 1.1)
     
     # Add viability issues
     n_low_viability = int(viability_issues * n_wells)
