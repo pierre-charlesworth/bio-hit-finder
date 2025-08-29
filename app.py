@@ -13,6 +13,8 @@ from plotly.subplots import make_subplots
 import yaml
 import io
 import zipfile
+import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Dict, List, Any
 import logging
@@ -132,6 +134,278 @@ def process_uploaded_files(files_data: Dict[str, bytes],
         return None
 
 
+def _unused_load_dataframe_from_bytes(filename: str, file_data: bytes, sheet_name: Optional[str] = None) -> pd.DataFrame:
+    """Load DataFrame directly from bytes data without temporary files when possible.
+    
+    Args:
+        filename: Original filename (used to determine file type)
+        file_data: File content as bytes
+        sheet_name: Sheet name for Excel files (None for CSV or first sheet)
+        
+    Returns:
+        DataFrame with loaded data
+        
+    Raises:
+        Exception: If file cannot be loaded
+    """
+    try:
+        if filename.endswith(('.xlsx', '.xls')):
+            # For Excel files, we need to use BytesIO
+            excel_buffer = io.BytesIO(file_data)
+            if sheet_name is None:
+                df = pd.read_excel(excel_buffer)
+            else:
+                df = pd.read_excel(excel_buffer, sheet_name=sheet_name)
+            excel_buffer.close()  # Close BytesIO buffer
+        elif filename.endswith('.csv'):
+            # For CSV files, use StringIO
+            text_data = file_data.decode('utf-8')
+            csv_buffer = io.StringIO(text_data)
+            df = pd.read_csv(csv_buffer)
+            csv_buffer.close()  # Close StringIO buffer
+        else:
+            raise ValueError(f"Unsupported file format: {filename}")
+            
+        # Clean column names
+        df.columns = df.columns.str.strip()
+        return df
+        
+    except Exception as e:
+        logger.warning(f"Failed to load {filename} from memory, falling back to temporary file: {e}")
+        raise
+
+
+def get_excel_sheet_names_from_bytes(file_data: bytes) -> List[str]:
+    """Get Excel sheet names directly from bytes data.
+    
+    Args:
+        file_data: Excel file content as bytes
+        
+    Returns:
+        List of sheet names
+    """
+    excel_buffer = io.BytesIO(file_data)
+    try:
+        with pd.ExcelFile(excel_buffer) as excel_file:
+            return excel_file.sheet_names
+    finally:
+        excel_buffer.close()
+
+
+class TemporaryFileManager:
+    """Context manager for safely handling temporary files with Windows file locking."""
+    
+    def __init__(self, filename: str, file_data: bytes):
+        self.filename = filename
+        self.file_data = file_data
+        self.temp_path = None
+        self.excel_file = None
+        
+    def __enter__(self):
+        # Create temporary file
+        self.temp_path = Path(tempfile.gettempdir()) / self.filename
+        self.temp_path.parent.mkdir(exist_ok=True)
+        self.temp_path.write_bytes(self.file_data)
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Close any open Excel files first
+        if self.excel_file is not None:
+            try:
+                self.excel_file.close()
+            except:
+                pass  # Ignore close errors
+        
+        # Force garbage collection
+        gc.collect()
+        
+        # Clean up temporary file
+        if self.temp_path:
+            safe_cleanup_temp_file(self.temp_path)
+    
+    def get_sheet_names(self):
+        """Get sheet names for Excel files, handling file closure properly."""
+        if self.filename.endswith(('.xlsx', '.xls')):
+            # Use context manager to ensure file is closed
+            with pd.ExcelFile(self.temp_path) as excel_file:
+                sheet_names = excel_file.sheet_names
+            return sheet_names
+        else:
+            return [None]  # CSV has no sheets
+
+
+def safe_cleanup_temp_file(temp_path: Path, max_attempts: int = 5, delay: float = 0.1) -> bool:
+    """Safely clean up temporary file with retry logic for Windows file locking.
+    
+    Args:
+        temp_path: Path to the temporary file to delete
+        max_attempts: Maximum number of deletion attempts
+        delay: Delay between attempts in seconds
+        
+    Returns:
+        True if file was successfully deleted or doesn't exist, False otherwise
+    """
+    if not temp_path.exists():
+        return True
+    
+    # Force garbage collection to release any lingering file handles
+    gc.collect()
+    
+    for attempt in range(max_attempts):
+        try:
+            temp_path.unlink()
+            return True
+        except PermissionError:
+            if attempt < max_attempts - 1:
+                time.sleep(delay)
+                gc.collect()  # Try to force garbage collection again
+            else:
+                logger.warning(f"Failed to delete temporary file {temp_path} after {max_attempts} attempts")
+                return False
+        except FileNotFoundError:
+            # File was already deleted
+            return True
+        except Exception as e:
+            logger.warning(f"Unexpected error deleting temporary file {temp_path}: {e}")
+            return False
+    
+    return False
+
+
+@st.cache_data(ttl=3600)
+def process_all_sheets_from_files(
+    files_data: Dict[str, bytes],
+    viability_threshold: float,
+    apply_bscore: bool,
+    hit_calling_enabled: bool = False,
+    hit_calling_config: Optional[Dict[str, Any]] = None,
+    column_mapping: Optional[Dict[str, str]] = None
+) -> Dict[str, Dict[str, Any]]:
+    """Process ALL sheets from uploaded Excel files.
+    
+    Returns:
+        Dict mapping sheet_key -> {processed_data, edge_results, processing_summary, 
+                                   hit_calling_results, metadata, error, error_message}
+    """
+    sheet_results = {}
+    processor = PlateProcessor(viability_threshold=viability_threshold)
+    
+    for filename, file_data in files_data.items():
+        # Create temporary file
+        temp_path = Path(tempfile.gettempdir()) / filename
+        temp_path.parent.mkdir(exist_ok=True)
+        temp_path.write_bytes(file_data)
+        
+        try:
+            # Get all sheets for Excel files
+            if filename.endswith(('.xlsx', '.xls')):
+                excel_file = pd.ExcelFile(temp_path)
+                sheet_names = excel_file.sheet_names
+                excel_file.close()  # Explicitly close to release file handle
+            else:
+                sheet_names = [None]  # CSV has no sheets
+            
+            # Process each sheet
+            for sheet_name in sheet_names:
+                sheet_key = f"{filename}::{sheet_name}" if sheet_name else filename
+                
+                try:
+                    # Load and process individual sheet
+                    raw_df = processor.load_plate_data(temp_path, sheet_name=sheet_name)
+                    
+                    # Auto-detect columns for first sheet, reuse mapping for subsequent sheets
+                    if not processor.column_mapping:
+                        processor.auto_detect_columns(raw_df)
+                    
+                    # Apply column mapping
+                    mapped_df = processor.apply_column_mapping(raw_df)
+                    
+                    # Generate plate ID
+                    plate_id = f"{Path(filename).stem}_{sheet_name}" if sheet_name else Path(filename).stem
+                    
+                    # Process with appropriate method
+                    if hit_calling_enabled and hit_calling_config:
+                        processed_df = processor.process_dual_readout_plate(
+                            mapped_df, plate_id, hit_calling_config
+                        )
+                    else:
+                        processed_df = processor.process_single_plate(mapped_df, plate_id)
+                    
+                    # Apply B-scoring if requested
+                    if apply_bscore and len(processed_df) > 0:
+                        bscore_processor = BScoreProcessor()
+                        for metric in ['Z_lptA', 'Z_ldtD']:
+                            if metric in processed_df.columns:
+                                b_scores = bscore_processor.calculate_bscores_for_plate(processed_df, metric)
+                                processed_df[f'B_{metric}'] = b_scores
+                    
+                    # Calculate edge effects
+                    edge_results = []
+                    if len(processed_df) > 0:
+                        edge_detector = EdgeEffectDetector()
+                        edge_results = edge_detector.detect_edge_effects_dataframe(
+                            processed_df, metric="Z_lptA"
+                        )
+                    
+                    # Calculate processing summary
+                    summary = calculate_plate_summary(processed_df)
+                    
+                    # Calculate hit calling results
+                    hit_calling_results = {}
+                    if hit_calling_enabled and hit_calling_config:
+                        try:
+                            plate_data = {plate_id: processed_df}
+                            hit_calling_results = analyze_multi_plate_hits(plate_data, hit_calling_config)
+                        except Exception as e:
+                            logger.warning(f"Hit calling failed for {sheet_key}: {e}")
+                    
+                    # Store successful result
+                    sheet_results[sheet_key] = {
+                        "processed_data": processed_df,
+                        "edge_results": edge_results,
+                        "processing_summary": summary,
+                        "hit_calling_results": hit_calling_results,
+                        "metadata": {
+                            "filename": filename,
+                            "sheet_name": sheet_name,
+                            "plate_count": len(processed_df['PlateID'].unique()) if 'PlateID' in processed_df.columns else 1,
+                            "total_wells": len(processed_df)
+                        },
+                        "error": False,
+                        "error_message": None
+                    }
+                    
+                except Exception as e:
+                    # Store error result
+                    logger.error(f"Failed to process {sheet_key}: {e}")
+                    sheet_results[sheet_key] = {
+                        "processed_data": None,
+                        "edge_results": [],
+                        "processing_summary": {},
+                        "hit_calling_results": {},
+                        "metadata": {
+                            "filename": filename,
+                            "sheet_name": sheet_name,
+                            "plate_count": 0,
+                            "total_wells": 0
+                        },
+                        "error": True,
+                        "error_message": str(e)
+                    }
+        
+        finally:
+            # Clean up temporary file - handle Windows file locking gracefully
+            if temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except (PermissionError, OSError) as e:
+                    # Windows file locking - ignore cleanup error, file will be cleaned by OS
+                    logger.debug(f"Could not delete temp file {temp_path}: {e}")
+                    pass
+    
+    return sheet_results
+
+
 def render_edge_effect_badge(warning_level: WarningLevel) -> str:
     """Render edge effect warning badge with appropriate styling."""
     level_colors = {
@@ -240,6 +514,16 @@ def main() -> None:
     if 'multi_stage_enabled' not in st.session_state:
         st.session_state.multi_stage_enabled = config.get('hit_calling', {}).get('multi_stage_enabled', False)
     
+    # Multi-sheet session state
+    if 'sheet_data' not in st.session_state:
+        st.session_state.sheet_data = {}
+    if 'current_sheet' not in st.session_state:
+        st.session_state.current_sheet = None
+    if 'available_sheets' not in st.session_state:
+        st.session_state.available_sheets = []
+    if 'multi_sheet_mode' not in st.session_state:
+        st.session_state.multi_sheet_mode = False
+    
     # Sidebar for file upload and configuration
     with st.sidebar:
         st.header("Configuration")
@@ -253,25 +537,105 @@ def main() -> None:
             help="Upload one or more plate datasets with required measurement columns"
         )
         
-        # Sheet selection for Excel files
-        sheet_selections = {}
+        # Multi-sheet processing mode toggle
         if uploaded_files:
             st.success(f"Uploaded {len(uploaded_files)} file(s)")
             
+            # Check if any files have multiple sheets
+            has_multi_sheet_files = False
             for file in uploaded_files:
                 if file.name.endswith(('.xlsx', '.xls')):
                     try:
-                        # Read Excel file to get sheet names
                         excel_file = pd.ExcelFile(file)
                         if len(excel_file.sheet_names) > 1:
-                            selected_sheet = st.selectbox(
-                                f"Sheet for {file.name}:",
-                                excel_file.sheet_names,
-                                key=f"sheet_{file.name}"
-                            )
-                            sheet_selections[file.name] = selected_sheet
+                            has_multi_sheet_files = True
+                            st.info(f"📊 {file.name}: {len(excel_file.sheet_names)} sheets detected")
+                        else:
+                            st.info(f"📄 {file.name}: 1 sheet")
                     except Exception as e:
                         st.warning(f"Could not read sheets from {file.name}: {e}")
+            
+            if has_multi_sheet_files:
+                st.subheader("📊 Processing Mode")
+                multi_sheet_mode = st.checkbox(
+                    "Multi-Sheet Mode",
+                    value=st.session_state.multi_sheet_mode,
+                    help="Process all sheets from Excel files simultaneously"
+                )
+                st.session_state.multi_sheet_mode = multi_sheet_mode
+                
+                if multi_sheet_mode:
+                    st.success("🔄 All Excel sheets will be processed at once")
+                else:
+                    st.info("📄 Single-sheet mode: Select specific sheets to process")
+            else:
+                st.session_state.multi_sheet_mode = False
+        
+        # Sheet selection - available for both single and multi-sheet modes
+        sheet_selections = {}
+        if uploaded_files:
+            for file in uploaded_files:
+                if file.name.endswith(('.xlsx', '.xls')):
+                    try:
+                        excel_file = pd.ExcelFile(file)
+                        if len(excel_file.sheet_names) > 1:
+                            if st.session_state.multi_sheet_mode:
+                                st.write(f"**{file.name}** - {len(excel_file.sheet_names)} sheets will be processed")
+                                # In multi-sheet mode, we'll process all sheets, but still show them for info
+                                with st.expander(f"View sheets in {file.name}"):
+                                    for sheet in excel_file.sheet_names:
+                                        st.write(f"• {sheet}")
+                            else:
+                                selected_sheet = st.selectbox(
+                                    f"Sheet for {file.name}:",
+                                    excel_file.sheet_names,
+                                    key=f"sheet_{file.name}"
+                                )
+                                sheet_selections[file.name] = selected_sheet
+                    except Exception as e:
+                        st.warning(f"Could not read sheets from {file.name}: {e}")
+        
+        # Sheet selector for multi-sheet mode (after processing)
+        if st.session_state.multi_sheet_mode and st.session_state.sheet_data:
+            st.subheader("📋 Sheet Selection")
+            
+            # Build sheet options
+            sheet_options = []
+            for sheet_key, sheet_data in st.session_state.sheet_data.items():
+                metadata = sheet_data['metadata']
+                filename = metadata['filename']
+                sheet_name = metadata['sheet_name']
+                error_flag = " ❌" if sheet_data['error'] else ""
+                wells = metadata['total_wells']
+                
+                display_name = f"{sheet_name} ({wells} wells){error_flag}"
+                sheet_options.append((display_name, sheet_key))
+            
+            if sheet_options:
+                current_selection = st.selectbox(
+                    "Select Sheet:",
+                    options=[option[1] for option in sheet_options],
+                    format_func=lambda x: next(opt[0] for opt in sheet_options if opt[1] == x),
+                    index=0 if st.session_state.current_sheet not in [opt[1] for opt in sheet_options] 
+                          else [opt[1] for opt in sheet_options].index(st.session_state.current_sheet),
+                    help="Switch between processed sheets instantly",
+                    key="sheet_selector"
+                )
+                
+                # Detect and handle selection changes
+                if current_selection != st.session_state.current_sheet:
+                    st.session_state.current_sheet = current_selection
+                    st.rerun()
+                else:
+                    st.session_state.current_sheet = current_selection
+                
+                # Show sheet info
+                current_data = st.session_state.sheet_data[current_selection]
+                if current_data['error']:
+                    st.error(f"Error: {current_data['error_message']}")
+                else:
+                    metadata = current_data['metadata']
+                    st.success(f"✅ {metadata['total_wells']} wells processed successfully")
         
         # Multi-stage hit calling toggle
         st.subheader("🎯 Hit Calling Mode")
@@ -502,11 +866,48 @@ def main() -> None:
                     for file in uploaded_files:
                         files_data[file.name] = file.getvalue()
                     
-                    # Process files
-                    processed_df = process_uploaded_files(
-                        files_data, sheet_selections, viability_threshold, 
-                        apply_b_scoring, multi_stage_enabled, hit_calling_config, column_mapping
-                    )
+                    # Choose processing method based on multi-sheet mode
+                    if st.session_state.multi_sheet_mode:
+                        # Multi-sheet processing
+                        sheet_results = process_all_sheets_from_files(
+                            files_data, viability_threshold, apply_b_scoring, 
+                            multi_stage_enabled, hit_calling_config, column_mapping
+                        )
+                        
+                        # Update session state
+                        st.session_state.sheet_data = sheet_results
+                        
+                        # Set default current sheet to first successful one
+                        successful_sheets = [key for key, data in sheet_results.items() if not data['error']]
+                        if successful_sheets:
+                            st.session_state.current_sheet = successful_sheets[0]
+                            st.session_state.available_sheets = [
+                                (data['metadata']['filename'], data['metadata']['sheet_name'], key)
+                                for key, data in sheet_results.items()
+                            ]
+                            
+                            # Use first successful sheet as processed_df for backward compatibility
+                            processed_df = sheet_results[successful_sheets[0]]['processed_data']
+                        
+                        # Show processing summary
+                        total_sheets = len(sheet_results)
+                        successful_sheets_count = len(successful_sheets)
+                        failed_sheets = total_sheets - successful_sheets_count
+                        
+                        if failed_sheets > 0:
+                            st.warning(f"Processed {successful_sheets_count}/{total_sheets} sheets successfully. "
+                                      f"{failed_sheets} sheets failed.")
+                        else:
+                            st.success(f"Successfully processed all {total_sheets} sheets!")
+                        
+                        # Force rerun to show the sheet selector dropdown
+                        st.rerun()
+                    else:
+                        # Single-sheet processing (existing logic)
+                        processed_df = process_uploaded_files(
+                            files_data, sheet_selections, viability_threshold, 
+                            apply_b_scoring, multi_stage_enabled, hit_calling_config, column_mapping
+                        )
                 
                 if processed_df is not None:
                     st.session_state.processed_data = processed_df
@@ -542,6 +943,34 @@ def main() -> None:
                 else:
                     st.error("Failed to process data. Please check your files and try again.")
     
+    # Helper function to get current sheet data
+    def get_current_sheet_data():
+        """Get the current sheet's data based on multi-sheet mode."""
+        if st.session_state.multi_sheet_mode and st.session_state.sheet_data:
+            current_sheet = st.session_state.current_sheet
+            if current_sheet and current_sheet in st.session_state.sheet_data:
+                return st.session_state.sheet_data[current_sheet]
+        
+        # Fallback to legacy single-sheet data
+        return {
+            'processed_data': st.session_state.get('processed_data'),
+            'edge_results': st.session_state.get('edge_results', []),
+            'processing_summary': st.session_state.get('processing_summary', {}),
+            'hit_calling_results': st.session_state.get('hit_calling_results', {}),
+            'error': False,
+            'error_message': None
+        }
+    
+    # Display current plate indicator for multi-sheet mode
+    if st.session_state.multi_sheet_mode and st.session_state.sheet_data and st.session_state.current_sheet:
+        current_data = get_current_sheet_data()
+        if not current_data['error']:
+            metadata = current_data['metadata']
+            filename = metadata['filename']
+            sheet_name = metadata['sheet_name']
+            wells_count = metadata['total_wells']
+            st.info(f"📋 **Currently viewing:** {sheet_name} ({wells_count:,} wells)")
+    
     # Main content tabs - add specialized tabs if multi-stage is enabled
     if st.session_state.multi_stage_enabled:
         summary_tab, hits_tab, reporter_hits_tab, vitality_hits_tab, hit_calling_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
@@ -566,11 +995,17 @@ def main() -> None:
         vitality_hits_tab = None
         hit_calling_tab = None  # No specialized tabs in standard mode
     
-    # Get processed data
-    df = st.session_state.processed_data
-    edge_results = st.session_state.edge_results
-    summary = st.session_state.processing_summary
-    hit_calling_results = st.session_state.hit_calling_results
+    # Get current sheet data
+    current_data = get_current_sheet_data()
+    df = current_data['processed_data']
+    edge_results = current_data['edge_results']
+    summary = current_data['processing_summary']
+    hit_calling_results = current_data['hit_calling_results']
+    
+    # Check for sheet errors
+    if current_data['error']:
+        st.error(f"Sheet processing failed: {current_data['error_message']}")
+        st.stop()
     
     # Summary Tab
     with summary_tab:
@@ -738,6 +1173,7 @@ def main() -> None:
             # Show sample data structure
             st.subheader("Expected Data Structure")
             sample_cols = ['PlateID', 'Well', 'Row', 'Col', 'BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA']
+            # pandas (pd) is already imported at the top of the file
             sample_data = pd.DataFrame({
                 col: ['Plate001', 'A01', 'A', '1', '1000', '2000', '800', '1500', '0.5', '0.3', '0.4'] if i == 0 
                      else ['Plate001', 'A02', 'A', '2', '1200', '1800', '900', '1400', '0.6', '0.4', '0.5'] if i == 1
@@ -982,8 +1418,8 @@ def main() -> None:
             
             if df is not None and len(df) > 0:
                 # Check if reporter hit data is available
-                if 'LumHit' in df.columns:
-                    reporter_hits_df = df[df['LumHit'] == True].copy()
+                if 'reporter_hit' in df.columns:
+                    reporter_hits_df = df[df['reporter_hit'] == True].copy()
                     
                     # Controls for Reporter Hits
                     control_col1, control_col2 = st.columns(2)
@@ -997,11 +1433,12 @@ def main() -> None:
                         )
                     
                     with control_col2:
+                        max_hits = len(reporter_hits_df) if len(reporter_hits_df) > 0 else 100
                         display_top_n_reporter = st.number_input(
                             "Display Top N:",
-                            min_value=10,
-                            max_value=min(1000, len(reporter_hits_df) if len(reporter_hits_df) > 0 else 100),
-                            value=min(100, len(reporter_hits_df) if len(reporter_hits_df) > 0 else 100),
+                            min_value=min(10, max_hits),
+                            max_value=min(1000, max_hits),
+                            value=min(max_hits, max(min(10, max_hits), min(100, max_hits))),
                             step=10,
                             key="reporter_top_n"
                         )
@@ -1109,8 +1546,8 @@ def main() -> None:
             
             if df is not None and len(df) > 0:
                 # Check if vitality hit data is available
-                if 'OMpatternOK' in df.columns:
-                    vitality_hits_df = df[df['OMpatternOK'] == True].copy()
+                if 'vitality_hit' in df.columns:
+                    vitality_hits_df = df[df['vitality_hit'] == True].copy()
                     
                     # Controls for Vitality Hits
                     control_col1, control_col2 = st.columns(2)
@@ -1124,12 +1561,13 @@ def main() -> None:
                         )
                     
                     with control_col2:
+                        vitality_count = len(vitality_hits_df) if len(vitality_hits_df) > 0 else 100
                         display_top_n_vitality = st.number_input(
                             "Display Top N:",
-                            min_value=10,
-                            max_value=min(1000, len(vitality_hits_df) if len(vitality_hits_df) > 0 else 100),
-                            value=min(100, len(vitality_hits_df) if len(vitality_hits_df) > 0 else 100),
-                            step=10,
+                            min_value=min(10, vitality_count),
+                            max_value=min(1000, vitality_count),
+                            value=min(100, vitality_count, max(10, vitality_count)),
+                            step=1 if vitality_count < 10 else 10,
                             key="vitality_top_n"
                         )
                     
@@ -1182,10 +1620,6 @@ def main() -> None:
                         display_cols.append('OMpatternOK')
                         
                         # Add Z-scores if available (for context)
-                        if apply_b_scoring and all(col in vitality_hits_df.columns for col in ['B_Z_lptA', 'B_Z_ldtD']):
-                            display_cols.extend(['B_Z_lptA', 'B_Z_ldtD'])
-                        elif all(col in vitality_hits_df.columns for col in ['Z_lptA', 'Z_ldtD']):
-                            display_cols.extend(['Z_lptA', 'Z_ldtD'])
                         
                         # Filter to existing columns and remove duplicates
                         existing_display_cols = list(dict.fromkeys([col for col in display_cols if col in vitality_hits_df.columns]))
@@ -1260,7 +1694,7 @@ def main() -> None:
                     st.subheader("Hit Calling Summary")
                     
                     # Display summary statistics
-                    summary_stats = hit_calling_results.get('summary', {})
+                    summary_stats = hit_calling_results.get('cross_plate_summary', {})
                     col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
@@ -1268,43 +1702,62 @@ def main() -> None:
                         st.metric("Total Wells", f"{total_wells:,}")
                         
                     with col2:
-                        reporter_hits = summary_stats.get('reporter_hits', 0)
-                        reporter_rate = summary_stats.get('reporter_hit_rate', 0) * 100
+                        reporter_hits = summary_stats.get('total_reporter_hits', 0)
+                        reporter_rate = (reporter_hits / total_wells * 100) if total_wells > 0 else 0
                         st.metric("Reporter Hits", f"{reporter_hits:,}", f"{reporter_rate:.1f}%")
                         
                     with col3:
-                        vitality_hits = summary_stats.get('vitality_hits', 0)
-                        vitality_rate = summary_stats.get('vitality_hit_rate', 0) * 100
+                        vitality_hits = summary_stats.get('total_vitality_hits', 0)
+                        vitality_rate = (vitality_hits / total_wells * 100) if total_wells > 0 else 0
                         st.metric("Vitality Hits", f"{vitality_hits:,}", f"{vitality_rate:.1f}%")
                         
                     with col4:
-                        platform_hits = summary_stats.get('platform_hits', 0)
-                        platform_rate = summary_stats.get('platform_hit_rate', 0) * 100
+                        platform_hits = summary_stats.get('total_platform_hits', 0)
+                        platform_rate = (platform_hits / total_wells * 100) if total_wells > 0 else 0
                         st.metric("Platform Hits", f"{platform_hits:,}", f"{platform_rate:.1f}%")
                     
-                    # Stage progression visualization
+                    # Multiple visualization options
                     if summary_stats:
-                        st.subheader("Hit Calling Stage Progression")
+                        st.subheader("Hit Calling Pipeline Visualizations")
                         
-                        progression_data = {
-                            'Stage': ['Total Wells', 'Reporter Hits', 'Vitality Hits', 'Platform Hits'],
-                            'Count': [
-                                summary_stats.get('total_wells', 0),
-                                summary_stats.get('reporter_hits', 0),
-                                summary_stats.get('vitality_hits', 0),
-                                summary_stats.get('platform_hits', 0)
-                            ]
-                        }
+                        # Get the hit counts
+                        total_wells = summary_stats.get('total_wells', 0)
+                        reporter_hits = summary_stats.get('total_reporter_hits', 0)
+                        vitality_hits = summary_stats.get('total_vitality_hits', 0)
+                        platform_hits = summary_stats.get('total_platform_hits', 0)
                         
-                        fig_progression = px.bar(
-                            progression_data,
-                            x='Stage',
-                            y='Count',
-                            title='Hit Calling Stage Progression',
-                            color='Stage',
-                            color_discrete_sequence=['lightblue', 'orange', 'lightgreen', 'red']
+                        # Use Sankey as the primary visualization
+                        st.subheader("Hit Calling Pipeline Flow")
+                        
+                        # Create Sankey flow diagram
+                        fig_sankey = go.Figure(data=[go.Sankey(
+                            node = dict(
+                                pad = 15,
+                                thickness = 20,
+                                line = dict(color = "black", width = 0.5),
+                                label = [
+                                    f"Total Wells<br>({total_wells})",
+                                    f"Reporter Hits<br>({reporter_hits})", 
+                                    f"Vitality Hits<br>({vitality_hits})",
+                                    f"Platform Hits<br>({platform_hits})"
+                                ],
+                                color = ["lightblue", "orange", "lightgreen", "crimson"]
+                            ),
+                            link = dict(
+                                source = [0, 0, 1, 2],
+                                target = [1, 2, 3, 3], 
+                                value = [reporter_hits, vitality_hits, platform_hits, platform_hits],
+                                color = ["rgba(255,165,0,0.6)", "rgba(144,238,144,0.6)", 
+                                       "rgba(220,20,60,0.8)", "rgba(220,20,60,0.8)"]
+                            )
+                        )])
+                        
+                        fig_sankey.update_layout(
+                            title="Multi-Stage Hit Calling Flow",
+                            height=400,
+                            margin=dict(l=50, r=50, t=60, b=50)
                         )
-                        st.plotly_chart(fig_progression, width='stretch')
+                        st.plotly_chart(fig_sankey, use_container_width=True)
                     
                     # Hit analysis report
                     st.subheader("Analysis Report")
