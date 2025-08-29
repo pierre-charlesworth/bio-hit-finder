@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        /* Base styling for professional PDF reports */
+        @page {
+            size: A4;
+            margin: {{ config.export.pdf.margins.top or 20 }}mm 
+                   {{ config.export.pdf.margins.right or 15 }}mm 
+                   {{ config.export.pdf.margins.bottom or 20 }}mm 
+                   {{ config.export.pdf.margins.left or 15 }}mm;
+            
+            @top-center {
+                content: "{{ title }}";
+                font-size: 10pt;
+                color: #666;
+            }
+            
+            @bottom-center {
+                content: "Page " counter(page) " of " counter(pages);
+                font-size: 9pt;
+                color: #666;
+            }
+        }
+        
+        body {
+            font-family: 'DejaVu Sans', Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        
+        h1 {
+            font-size: 20pt;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        h2 {
+            font-size: 16pt;
+            color: #34495e;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 5px;
+        }
+        
+        h3 {
+            font-size: 13pt;
+            color: #2c3e50;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .page-break {
+            page-break-before: always;
+        }
+        
+        .summary-section {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 15px 0;
+        }
+        
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ccc;
+        }
+        
+        .summary-item:last-child {
+            border-bottom: none;
+        }
+        
+        .summary-label {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .summary-value {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .formula {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-left: 4px solid #3498db;
+            border-radius: 4px;
+            padding: 12px 15px;
+            margin: 12px 0;
+            font-family: 'DejaVu Sans Mono', 'Courier New', monospace;
+            font-size: 11pt;
+            line-height: 1.6;
+        }
+        
+        .formula-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .formula-equation {
+            background-color: white;
+            border: 1px solid #e9ecef;
+            border-radius: 3px;
+            padding: 8px 10px;
+            margin: 5px 0;
+            text-align: center;
+            font-size: 12pt;
+        }
+        
+        .methodology {
+            background-color: #fff;
+            border-left: 4px solid #27ae60;
+            padding: 15px 20px;
+            margin: 15px 0;
+            text-align: justify;
+        }
+        
+        .table-container {
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+        
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            background-color: white;
+        }
+        
+        .summary-table th,
+        .summary-table td {
+            border: 1px solid #dee2e6;
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        .summary-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .summary-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .numeric {
+            text-align: right;
+            font-family: 'DejaVu Sans Mono', monospace;
+        }
+        
+        .plot-container {
+            text-align: center;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        
+        .plot-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        
+        .plot-caption {
+            font-style: italic;
+            color: #666;
+            margin-top: 8px;
+            font-size: 9pt;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 9pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-good {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .status-warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-critical {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
+        .metadata-section {
+            font-size: 9pt;
+            color: #666;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .footer-info {
+            text-align: center;
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            font-size: 9pt;
+            color: #666;
+        }
+        
+        /* Quality indicators */
+        .quality-metric {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 10pt;
+            font-weight: bold;
+        }
+        
+        .quality-excellent {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .quality-good {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .quality-fair {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .quality-poor {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <!-- Title Page -->
+    <div class="title-page">
+        <h1>{{ title }}</h1>
+        
+        <div class="summary-section">
+            <h3>Executive Summary</h3>
+            <div class="summary-grid">
+                <div>
+                    <div class="summary-item">
+                        <span class="summary-label">Total Wells:</span>
+                        <span class="summary-value">{{ summary.total_wells | format_number(0) }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Total Plates:</span>
+                        <span class="summary-value">{{ summary.total_plates }}</span>
+                    </div>
+                    {% if summary.viable_wells is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">Viable Wells:</span>
+                        <span class="summary-value">{{ summary.viable_wells }} ({{ summary.viability_rate | format_percent }})</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if summary.z_score_stats is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">Strong Hits (|Z| ≥ 3):</span>
+                        <span class="summary-value">{{ summary.z_score_stats.hits_z3 }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Potential Hits (|Z| ≥ 2):</span>
+                        <span class="summary-value">{{ summary.z_score_stats.hits_z2 }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">Z-Score Range:</span>
+                        <span class="summary-value">{{ summary.z_score_stats.min | format_number }} to {{ summary.z_score_stats.max | format_number }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Processing timestamp -->
+            <div class="metadata-section">
+                <strong>Generated:</strong> {{ summary.processing_timestamp }}<br>
+                <strong>Software:</strong> Bio-Hit-Finder Platform v1.0.0
+            </div>
+        </div>
+    </div>
+    
+    <!-- Methodology Section -->
+    {% if config.export.pdf.include_methodology %}
+    <div class="page-break">
+        <h2>Processing Methodology</h2>
+        
+        <div class="methodology">
+            <h3>Overview</h3>
+            <p>{{ methodology.overview }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Data Normalization</h3>
+            <p>{{ methodology.normalization }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Statistical Analysis</h3>
+            <p>{{ methodology.zscore_calculation }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Quality Control</h3>
+            <p>{{ methodology.quality_control }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Viability Assessment</h3>
+            <p>{{ methodology.viability_gating }}</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Formulas Section -->
+    {% if config.export.pdf.include_formulas %}
+    <div class="page-break">
+        <h2>Mathematical Formulas</h2>
+        
+        <div class="formula">
+            <div class="formula-title">Reporter Ratios</div>
+            <div class="formula-equation">{{ formulas.reporter_ratio_lpta }}</div>
+            <div class="formula-equation">{{ formulas.reporter_ratio_ldtd }}</div>
+        </div>
+        
+        <div class="formula">
+            <div class="formula-title">OD Normalization</div>
+            <div class="formula-equation">{{ formulas.od_normalization }}</div>
+            <p>Applied to WT, tolC, and SA strains independently</p>
+        </div>
+        
+        <div class="formula">
+            <div class="formula-title">Robust Z-Score Calculation</div>
+            <div class="formula-equation">{{ formulas.robust_zscore }}</div>
+            <p>Where MAD is the Median Absolute Deviation:</p>
+            <div class="formula-equation">{{ formulas.mad_calculation }}</div>
+        </div>
+        
+        <div class="formula">
+            <div class="formula-title">Viability Gate</div>
+            <div class="formula-equation">{{ formulas.viability_gate }}</div>
+            <p>Default threshold f = {{ config.processing.viability_threshold or 0.3 }}</p>
+        </div>
+        
+        {% if config.bscore.enabled %}
+        <div class="formula">
+            <div class="formula-title">B-Score (Median Polish)</div>
+            <div class="formula-equation">{{ formulas.bscore_formula }}</div>
+            <p>Applied when systematic row/column effects are detected</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Plate-by-Plate Results -->
+    <div class="page-break">
+        <h2>Plate-by-Plate Analysis</h2>
+        
+        {% for plate in plate_summaries %}
+        <div class="summary-section">
+            <h3>Plate {{ plate.plate_id }}</h3>
+            
+            <div class="summary-grid">
+                <div>
+                    <div class="summary-item">
+                        <span class="summary-label">Well Count:</span>
+                        <span class="summary-value">{{ plate.well_count }}</span>
+                    </div>
+                    {% if plate.viable_wells is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">Viable Wells:</span>
+                        <span class="summary-value">{{ plate.viable_wells }} ({{ plate.viability_rate | format_percent }})</span>
+                    </div>
+                    {% endif %}
+                    {% if plate.strong_hits is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">Strong Hits (|Z| ≥ 3):</span>
+                        <span class="summary-value">{{ plate.strong_hits }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if plate.ratio_lpta_median is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">lptA Ratio (median):</span>
+                        <span class="summary-value">{{ plate.ratio_lpta_median | format_number }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">lptA MAD:</span>
+                        <span class="summary-value">{{ plate.ratio_lpta_mad | format_number }}</span>
+                    </div>
+                    {% endif %}
+                    {% if plate.ratio_ldtd_median is defined %}
+                    <div class="summary-item">
+                        <span class="summary-label">ldtD Ratio (median):</span>
+                        <span class="summary-value">{{ plate.ratio_ldtd_median | format_number }}</span>
+                    </div>
+                    <div class="summary-item">
+                        <span class="summary-label">ldtD MAD:</span>
+                        <span class="summary-value">{{ plate.ratio_ldtd_mad | format_number }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Quality assessment -->
+            <div style="margin-top: 15px;">
+                <strong>Quality Assessment:</strong><br>
+                {% if plate.viability_rate is defined %}
+                    {% if plate.viability_rate >= 0.9 %}
+                        <span class="quality-metric quality-excellent">Viability: Excellent</span>
+                    {% elif plate.viability_rate >= 0.8 %}
+                        <span class="quality-metric quality-good">Viability: Good</span>
+                    {% elif plate.viability_rate >= 0.6 %}
+                        <span class="quality-metric quality-fair">Viability: Fair</span>
+                    {% else %}
+                        <span class="quality-metric quality-poor">Viability: Poor</span>
+                    {% endif %}
+                {% endif %}
+                
+                {% if plate.z_range is defined %}
+                    {% if plate.z_range <= 6 %}
+                        <span class="quality-metric quality-excellent">Dynamic Range: Excellent</span>
+                    {% elif plate.z_range <= 10 %}
+                        <span class="quality-metric quality-good">Dynamic Range: Good</span>
+                    {% elif plate.z_range <= 15 %}
+                        <span class="quality-metric quality-fair">Dynamic Range: Fair</span>
+                    {% else %}
+                        <span class="quality-metric quality-poor">Dynamic Range: Wide</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Visualizations -->
+    {% if plots %}
+    <div class="page-break">
+        <h2>Data Visualizations</h2>
+        
+        {% if plots.zscore_overview %}
+        <div class="plot-container">
+            <img src="{{ plots.zscore_overview }}" alt="Z-Score Overview">
+            <div class="plot-caption">
+                Figure 1: Z-Score distribution across all metrics. Horizontal lines indicate significance thresholds (±2, ±3).
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if plots.ratio_lpta_dist %}
+        <div class="plot-container">
+            <img src="{{ plots.ratio_lpta_dist }}" alt="lptA Ratio Distribution">
+            <div class="plot-caption">
+                Figure 2: Distribution of lptA reporter ratios. Red dashed line shows plate median.
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if plots.ratio_ldtd_dist %}
+        <div class="plot-container">
+            <img src="{{ plots.ratio_ldtd_dist }}" alt="ldtD Ratio Distribution">
+            <div class="plot-caption">
+                Figure 3: Distribution of ldtD reporter ratios. Red dashed line shows plate median.
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if plots.z_lpta_dist %}
+        <div class="plot-container">
+            <img src="{{ plots.z_lpta_dist }}" alt="lptA Z-Score Distribution">
+            <div class="plot-caption">
+                Figure 4: Distribution of lptA Z-scores. Values beyond ±2 are considered potential hits.
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if plots.z_ldtd_dist %}
+        <div class="plot-container">
+            <img src="{{ plots.z_ldtd_dist }}" alt="ldtD Z-Score Distribution">
+            <div class="plot-caption">
+                Figure 5: Distribution of ldtD Z-scores. Values beyond ±2 are considered potential hits.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Configuration and Processing Parameters -->
+    <div class="page-break">
+        <h2>Processing Configuration</h2>
+        
+        <div class="table-container">
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Value</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Viability Threshold</td>
+                        <td class="numeric">{{ config.processing.viability_threshold or 0.3 }}</td>
+                        <td>Fraction of median ATP for viability gating</td>
+                    </tr>
+                    <tr>
+                        <td>Z-Score Cutoff</td>
+                        <td class="numeric">{{ config.processing.z_score_cutoff or 2.0 }}</td>
+                        <td>Threshold for potential hit identification</td>
+                    </tr>
+                    <tr>
+                        <td>B-Scoring</td>
+                        <td>{{ "Enabled" if config.bscore.enabled else "Disabled" }}</td>
+                        <td>Row/column bias correction using median polish</td>
+                    </tr>
+                    {% if config.bscore.enabled %}
+                    <tr>
+                        <td>B-Score Iterations</td>
+                        <td class="numeric">{{ config.bscore.max_iterations or 10 }}</td>
+                        <td>Maximum iterations for median polish convergence</td>
+                    </tr>
+                    <tr>
+                        <td>B-Score Tolerance</td>
+                        <td class="numeric">{{ config.bscore.tolerance or 1e-6 }}</td>
+                        <td>Convergence tolerance for median polish</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td>Edge Effect Detection</td>
+                        <td>{{ config.edge_warning.metric or "Z_lptA" }}</td>
+                        <td>Metric used for spatial artifact detection</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Footer Information -->
+    <div class="footer-info">
+        <p><strong>Bio-Hit-Finder Platform</strong> - Automated Plate Analysis System</p>
+        <p>Generated on {{ summary.processing_timestamp }} | Version 1.0.0</p>
+        <p>For technical support or questions about this analysis, please refer to the platform documentation.</p>
+    </div>
+    
+    <!-- Technical Notes -->
+    <div class="metadata-section">
+        <h3>Technical Notes</h3>
+        <ul style="font-size: 9pt;">
+            <li>All statistical calculations use robust methods (median and MAD) to minimize outlier influence</li>
+            <li>Z-scores are calculated independently for each metric and plate</li>
+            <li>Viability gating excludes wells with low ATP levels from hit calling but retains them for visualization</li>
+            <li>Edge effect detection uses spatial analysis to identify systematic plate artifacts</li>
+            {% if config.bscore.enabled %}
+            <li>B-scoring applies median polish algorithm to correct for systematic row/column biases</li>
+            {% endif %}
+            <li>Quality control metrics are calculated per plate to assess overall assay performance</li>
+        </ul>
+    </div>
+</body>
+</html>

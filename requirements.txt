@@ -1,0 +1,45 @@
+# Core dependencies for bio-hit-finder platform
+# Generated from pyproject.toml for compatibility with pip and deployment tools
+
+# Core data processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Web application framework
+streamlit>=1.28.0
+
+# Visualization
+plotly>=5.15.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# File I/O and Excel support
+openpyxl>=3.1.0
+xlsxwriter>=3.1.0
+
+# PDF generation and templating
+jinja2>=3.1.0
+weasyprint>=60.0
+kaleido>=0.2.1
+
+# Configuration and utilities
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Type hints and validation
+typing-extensions>=4.7.0
+pydantic>=2.0.0
+
+# Optional high-performance backend (uncomment to enable)
+# polars>=0.20.0
+
+# Development dependencies (uncomment for development)
+# pytest>=7.4.0
+# pytest-cov>=4.1.0
+# pytest-xdist>=3.3.0
+# ruff>=0.1.0
+# mypy>=1.5.0
+# black>=23.0.0
+# isort>=5.12.0
+# pre-commit>=3.4.0

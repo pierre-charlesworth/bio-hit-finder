@@ -1,0 +1,1584 @@
+"""Main Streamlit application entry point for the bio-hit-finder platform.
+
+This is the primary entry point for the Streamlit web application.
+Run with: streamlit run app.py
+"""
+
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import yaml
+import io
+import zipfile
+from pathlib import Path
+from typing import Optional, Dict, List, Any
+import logging
+
+# Import core modules
+from core.plate_processor import PlateProcessor, PlateProcessingError, get_available_excel_sheets
+from core.calculations import calculate_plate_summary
+from analytics.edge_effects import EdgeEffectDetector, WarningLevel
+from analytics.bscore import BScoreProcessor
+from analytics.hit_calling import HitCallingAnalyzer, analyze_multi_plate_hits, format_hit_calling_report
+from sample_data_generator import create_demo_data
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Configure the Streamlit page
+st.set_page_config(
+    page_title="Plate Data Processing Platform",
+    page_icon="🧬",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+@st.cache_data
+def load_config() -> Dict[str, Any]:
+    """Load configuration from config.yaml."""
+    try:
+        with open('config.yaml', 'r') as f:
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.warning(f"Could not load config.yaml: {e}. Using defaults.")
+        return {}
+
+
+@st.cache_data(ttl=3600)
+def process_uploaded_files(files_data: Dict[str, bytes], 
+                          sheet_selections: Dict[str, str],
+                          viability_threshold: float,
+                          apply_bscore: bool,
+                          hit_calling_enabled: bool = False,
+                          hit_calling_config: Optional[Dict[str, Any]] = None,
+                          column_mapping: Optional[Dict[str, str]] = None) -> Optional[pd.DataFrame]:
+    """Process uploaded files and return combined dataframe."""
+    try:
+        processor = PlateProcessor(viability_threshold=viability_threshold)
+        
+        # Process each file
+        plate_files = {}
+        sheet_names = {}
+        
+        for filename, file_data in files_data.items():
+            # Create temporary file
+            temp_path = Path(f"/tmp/{filename}")
+            temp_path.parent.mkdir(exist_ok=True)
+            temp_path.write_bytes(file_data)
+            
+            plate_id = Path(filename).stem
+            plate_files[plate_id] = temp_path
+            
+            if filename in sheet_selections:
+                sheet_names[plate_id] = sheet_selections[filename]
+        
+        # Process multiple plates with hit calling if enabled
+        if hit_calling_enabled and hit_calling_config:
+            # Process each plate individually with dual-readout method
+            processed_plates = []
+            for plate_id, temp_path in plate_files.items():
+                sheet_name = sheet_names.get(plate_id)
+                raw_df = processor.load_plate_data(temp_path, sheet_name=sheet_name)
+                
+                # Auto-detect columns for first plate, reuse mapping for subsequent plates
+                if not processor.column_mapping:
+                    processor.auto_detect_columns(raw_df)
+                
+                # Apply column mapping
+                mapped_df = processor.apply_column_mapping(raw_df)
+                
+                # Process with dual-readout hit calling
+                processed_df = processor.process_dual_readout_plate(mapped_df, plate_id, hit_calling_config)
+                processed_plates.append(processed_df)
+            
+            combined_df = pd.concat(processed_plates, ignore_index=True)
+        else:
+            # Standard processing
+            combined_df = processor.process_multiple_plates(plate_files, sheet_names)
+        
+        # Apply B-scoring if requested
+        if apply_bscore and len(combined_df) > 0:
+            bscore_processor = BScoreProcessor()
+            
+            # Group by plate for B-scoring
+            processed_plates = []
+            for plate_id in combined_df['PlateID'].unique():
+                plate_df = combined_df[combined_df['PlateID'] == plate_id].copy()
+                
+                # Apply B-scoring to Z-scores
+                for metric in ['Z_lptA', 'Z_ldtD']:
+                    if metric in plate_df.columns:
+                        b_scores = bscore_processor.calculate_bscores_for_plate(plate_df, metric)
+                        plate_df[f'B_{metric}'] = b_scores
+                
+                processed_plates.append(plate_df)
+            
+            combined_df = pd.concat(processed_plates, ignore_index=True)
+        
+        # Clean up temporary files
+        for temp_path in plate_files.values():
+            if temp_path.exists():
+                temp_path.unlink()
+        
+        return combined_df
+        
+    except Exception as e:
+        logger.error(f"Failed to process files: {e}")
+        st.error(f"Failed to process files: {e}")
+        return None
+
+
+def render_edge_effect_badge(warning_level: WarningLevel) -> str:
+    """Render edge effect warning badge with appropriate styling."""
+    level_colors = {
+        WarningLevel.INFO: "info",
+        WarningLevel.WARN: "warn", 
+        WarningLevel.CRITICAL: "critical"
+    }
+    
+    color_class = level_colors.get(warning_level, "info")
+    return f'<span class="badge {color_class}">{warning_level.value}</span>'
+
+
+def create_plate_heatmap(df: pd.DataFrame, metric: str, plate_id: str) -> go.Figure:
+    """Create a heatmap for a single plate."""
+    plate_df = df[df['PlateID'] == plate_id].copy() if 'PlateID' in df.columns else df.copy()
+    
+    # Create 8x12 matrix
+    matrix = np.full((8, 12), np.nan)
+    
+    # Map row letters to indices
+    row_mapping = {chr(ord('A') + i): i for i in range(8)}
+    
+    for _, row in plate_df.iterrows():
+        if 'Row' in row and 'Col' in row and metric in row:
+            try:
+                row_idx = row_mapping.get(str(row['Row']).upper(), None)
+                col_idx = int(row['Col']) - 1
+                
+                if row_idx is not None and 0 <= col_idx < 12:
+                    matrix[row_idx, col_idx] = row[metric]
+            except (ValueError, TypeError):
+                continue
+    
+    # Create heatmap
+    fig = go.Figure(data=go.Heatmap(
+        z=matrix,
+        x=[str(i+1) for i in range(12)],
+        y=[chr(ord('A') + i) for i in range(8)],
+        colorscale='RdBu_r' if metric.startswith(('Z_', 'B_Z')) else 'viridis',
+        zmid=0 if metric.startswith(('Z_', 'B_Z')) else None,
+        hovertemplate='Row: %{y}<br>Col: %{x}<br>Value: %{z:.3f}<extra></extra>'
+    ))
+    
+    fig.update_layout(
+        title=f'{metric} - {plate_id}',
+        xaxis_title='Column',
+        yaxis_title='Row',
+        height=400,
+        width=600
+    )
+    
+    return fig
+
+
+def main() -> None:
+    """Main application function."""
+    # Load configuration
+    config = load_config()
+    
+    # Add custom CSS for badges
+    st.markdown("""
+    <style>
+    .badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.375rem;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        display: inline-block;
+        margin: 0.125rem;
+    }
+    .badge.info {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    .badge.warn {
+        background-color: #fef3c7;
+        color: #d97706;
+    }
+    .badge.critical {
+        background-color: #fee2e2;
+        color: #dc2626;
+    }
+    .metric-card {
+        background-color: #f8fafc;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Header
+    st.title("Plate Data Processing Platform")
+    st.subheader("Normalization, scoring, B-scoring, and reporting")
+    
+    # Initialize session state
+    if 'processed_data' not in st.session_state:
+        st.session_state.processed_data = None
+    if 'edge_results' not in st.session_state:
+        st.session_state.edge_results = []
+    if 'processing_summary' not in st.session_state:
+        st.session_state.processing_summary = {}
+    if 'hit_calling_results' not in st.session_state:
+        st.session_state.hit_calling_results = {}
+    if 'multi_stage_enabled' not in st.session_state:
+        st.session_state.multi_stage_enabled = config.get('hit_calling', {}).get('multi_stage_enabled', False)
+    
+    # Sidebar for file upload and configuration
+    with st.sidebar:
+        st.header("Configuration")
+        
+        # File upload section
+        st.subheader("📁 Data Upload")
+        uploaded_files = st.file_uploader(
+            "Choose plate data files",
+            accept_multiple_files=True,
+            type=['csv', 'xlsx', 'xls'],
+            help="Upload one or more plate datasets with required measurement columns"
+        )
+        
+        # Sheet selection for Excel files
+        sheet_selections = {}
+        if uploaded_files:
+            st.success(f"Uploaded {len(uploaded_files)} file(s)")
+            
+            for file in uploaded_files:
+                if file.name.endswith(('.xlsx', '.xls')):
+                    try:
+                        # Read Excel file to get sheet names
+                        excel_file = pd.ExcelFile(file)
+                        if len(excel_file.sheet_names) > 1:
+                            selected_sheet = st.selectbox(
+                                f"Sheet for {file.name}:",
+                                excel_file.sheet_names,
+                                key=f"sheet_{file.name}"
+                            )
+                            sheet_selections[file.name] = selected_sheet
+                    except Exception as e:
+                        st.warning(f"Could not read sheets from {file.name}: {e}")
+        
+        # Multi-stage hit calling toggle
+        st.subheader("🎯 Hit Calling Mode")
+        
+        multi_stage_enabled = st.checkbox(
+            "Enable Multi-Stage Hit Calling",
+            value=st.session_state.multi_stage_enabled,
+            help="Enable advanced dual-readout compound screening with reporter, vitality, and platform hit stages"
+        )
+        st.session_state.multi_stage_enabled = multi_stage_enabled
+        
+        if multi_stage_enabled:
+            st.info("🔬 Multi-stage mode: Reporter → Vitality → Platform hits")
+        else:
+            st.info("📊 Standard mode: Single-stage Z-score based hit calling")
+        
+        # Configuration parameters
+        st.subheader("⚙️ Parameters")
+        
+        viability_threshold = st.slider(
+            "Viability Gate Threshold (f)",
+            min_value=0.1,
+            max_value=1.0,
+            value=config.get('processing', {}).get('viability_threshold', 0.3),
+            step=0.1,
+            help="Wells with ATP < f × median(ATP) are flagged as low viability"
+        )
+        
+        z_cutoff = st.number_input(
+            "Z-score Cutoff for Hits",
+            min_value=1.0,
+            max_value=5.0,
+            value=config.get('processing', {}).get('z_score_cutoff', 2.0),
+            step=0.1,
+            help="Minimum absolute Z-score to consider a well as a potential hit"
+        )
+        
+        top_n = st.number_input(
+            "Top N Hits to Display",
+            min_value=10,
+            max_value=1000,
+            value=config.get('processing', {}).get('top_n_hits', 50),
+            step=10,
+            help="Number of top hits to show in the hits table"
+        )
+        
+        apply_b_scoring = st.checkbox(
+            "Apply B-scoring",
+            value=config.get('bscore', {}).get('enabled', False),
+            help="Apply median-polish row/column bias correction"
+        )
+        
+        # Hit calling configuration panel (only shown when multi-stage is enabled)
+        hit_calling_config = None
+        if multi_stage_enabled:
+            with st.expander("🎯 Hit Calling Thresholds", expanded=True):
+                st.write("**Reporter Hit Detection (Stage 1)**")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    z_threshold_lptA = st.number_input(
+                        "lptA Z-score threshold",
+                        min_value=1.0,
+                        max_value=5.0,
+                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
+                        step=0.1,
+                        help="Minimum Z-score for lptA reporter hits"
+                    )
+                
+                with col2:
+                    z_threshold_ldtD = st.number_input(
+                        "ldtD Z-score threshold",
+                        min_value=1.0,
+                        max_value=5.0,
+                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_ldtD', 2.0),
+                        step=0.1,
+                        help="Minimum Z-score for ldtD reporter hits"
+                    )
+                
+                st.write("**Vitality Hit Detection (Stage 2)**")
+                col3, col4, col5 = st.columns(3)
+                
+                with col3:
+                    tolc_max_threshold = st.slider(
+                        "tolC max %",
+                        min_value=0.1,
+                        max_value=1.0,
+                        value=config.get('hit_calling', {}).get('vitality', {}).get('tolC_max_threshold', 0.8),
+                        step=0.05,
+                        help="tolC percentage must be ≤ this value"
+                    )
+                
+                with col4:
+                    wt_min_threshold = st.slider(
+                        "WT min %",
+                        min_value=0.1,
+                        max_value=1.0,
+                        value=config.get('hit_calling', {}).get('vitality', {}).get('wt_min_threshold', 0.8),
+                        step=0.05,
+                        help="WT percentage must be > this value"
+                    )
+                
+                with col5:
+                    sa_min_threshold = st.slider(
+                        "SA min %",
+                        min_value=0.1,
+                        max_value=1.0,
+                        value=config.get('hit_calling', {}).get('vitality', {}).get('sa_min_threshold', 0.8),
+                        step=0.05,
+                        help="SA percentage must be > this value"
+                    )
+                
+                # Build hit calling configuration
+                hit_calling_config = {
+                    'hit_calling': {
+                        'multi_stage_enabled': True,
+                        'reporter': {
+                            'z_threshold_lptA': z_threshold_lptA,
+                            'z_threshold_ldtD': z_threshold_ldtD,
+                            'require_viability': True,
+                            'combine_mode': 'OR'
+                        },
+                        'vitality': {
+                            'tolC_max_threshold': tolc_max_threshold,
+                            'wt_min_threshold': wt_min_threshold,
+                            'sa_min_threshold': sa_min_threshold,
+                            'require_all_conditions': True
+                        },
+                        'platform': {
+                            'require_both_stages': True
+                        }
+                    }
+                }
+        
+        # Advanced settings
+        with st.expander("🔧 Advanced Settings"):
+            edge_effect_threshold = st.slider(
+                "Edge Effect Threshold",
+                min_value=0.3,
+                max_value=2.0,
+                value=config.get('edge_warning', {}).get('levels', {}).get('warn_d', 0.8),
+                step=0.1,
+                help="Effect size threshold for edge effect warnings"
+            )
+            
+            enable_spatial_analysis = st.checkbox(
+                "Enable Spatial Analysis",
+                value=config.get('edge_warning', {}).get('spatial_autocorr', {}).get('enabled', False),
+                help="Enable computationally expensive spatial autocorrelation analysis"
+            )
+        
+        # Column mapping override
+        with st.expander("📋 Column Mapping"):
+            st.write("Manual column mapping (leave empty for auto-detection)")
+            
+            required_columns = ['BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA']
+            column_mapping = {}
+            
+            for col in required_columns:
+                mapped_col = st.text_input(f"{col}:", key=f"mapping_{col}", placeholder="Auto-detect")
+                if mapped_col:
+                    column_mapping[col] = mapped_col
+            
+            if not column_mapping:
+                column_mapping = None
+        
+        # Demo data option
+        st.divider()
+        st.write("**Or try with demo data:**")
+        use_demo_data = st.button("🎯 Load Demo Data", help="Load sample plate data to explore the platform")
+        
+        # Process data button
+        process_data = st.button("Process Data", type="primary", disabled=not (uploaded_files or use_demo_data))
+        
+        # Process files or demo data when button is clicked
+        if process_data:
+            with st.spinner("Processing plate data..."):
+                processed_df = None
+                
+                if use_demo_data:
+                    # Load and process demo data
+                    try:
+                        demo_df = create_demo_data()
+                        processor = PlateProcessor(viability_threshold)
+                        
+                        # Process each plate in demo data
+                        processed_plates = []
+                        for plate_id in demo_df['PlateID'].unique():
+                            plate_df = demo_df[demo_df['PlateID'] == plate_id].copy()
+                            
+                            # Choose processing method based on hit calling mode
+                            if multi_stage_enabled and hit_calling_config:
+                                processed_plate = processor.process_dual_readout_plate(plate_df, plate_id, hit_calling_config)
+                            else:
+                                processed_plate = processor.process_single_plate(plate_df, plate_id)
+                            
+                            processed_plates.append(processed_plate)
+                        
+                        processed_df = pd.concat(processed_plates, ignore_index=True)
+                        
+                        # Apply B-scoring if requested
+                        if apply_b_scoring and len(processed_df) > 0:
+                            bscore_processor = BScoreProcessor()
+                            processed_plates_bscore = []
+                            
+                            for plate_id in processed_df['PlateID'].unique():
+                                plate_df = processed_df[processed_df['PlateID'] == plate_id].copy()
+                                
+                                # Apply B-scoring to Z-scores
+                                for metric in ['Z_lptA', 'Z_ldtD']:
+                                    if metric in plate_df.columns:
+                                        b_scores = bscore_processor.calculate_b_scores(plate_df, metric)
+                                        plate_df[f'B_{metric}'] = b_scores
+                                
+                                processed_plates_bscore.append(plate_df)
+                            
+                            processed_df = pd.concat(processed_plates_bscore, ignore_index=True)
+                        
+                        st.success("Demo data loaded and processed successfully!")
+                        
+                    except Exception as e:
+                        st.error(f"Failed to load demo data: {e}")
+                        logger.error(f"Demo data error: {e}")
+                        
+                elif uploaded_files:
+                    # Convert uploaded files to bytes for caching
+                    files_data = {}
+                    for file in uploaded_files:
+                        files_data[file.name] = file.getvalue()
+                    
+                    # Process files
+                    processed_df = process_uploaded_files(
+                        files_data, sheet_selections, viability_threshold, 
+                        apply_b_scoring, multi_stage_enabled, hit_calling_config, column_mapping
+                    )
+                
+                if processed_df is not None:
+                    st.session_state.processed_data = processed_df
+                    
+                    # Calculate edge effects
+                    if len(processed_df) > 0:
+                        edge_detector = EdgeEffectDetector(
+                            thresholds={'warn_d': edge_effect_threshold},
+                            spatial_enabled=enable_spatial_analysis
+                        )
+                        st.session_state.edge_results = edge_detector.detect_edge_effects_dataframe(
+                            processed_df, metric="Z_lptA"
+                        )
+                    
+                    # Calculate processing summary
+                    processor = PlateProcessor(viability_threshold)
+                    for plate_id in processed_df['PlateID'].unique():
+                        plate_df = processed_df[processed_df['PlateID'] == plate_id]
+                        processor.processed_plates[plate_id] = plate_df
+                    
+                    st.session_state.processing_summary = processor.get_processing_summary()
+                    
+                    # Calculate hit calling analysis if multi-stage mode is enabled
+                    if multi_stage_enabled and hit_calling_config:
+                        try:
+                            plate_data = {plate_id: processed_df[processed_df['PlateID'] == plate_id] 
+                                        for plate_id in processed_df['PlateID'].unique()}
+                            hit_analysis = analyze_multi_plate_hits(plate_data, hit_calling_config)
+                            st.session_state.hit_calling_results = hit_analysis
+                        except Exception as e:
+                            logger.warning(f"Hit calling analysis failed: {e}")
+                            st.session_state.hit_calling_results = {}
+                else:
+                    st.error("Failed to process data. Please check your files and try again.")
+    
+    # Main content tabs - add specialized tabs if multi-stage is enabled
+    if st.session_state.multi_stage_enabled:
+        summary_tab, hits_tab, reporter_hits_tab, vitality_hits_tab, hit_calling_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
+            "📊 Summary", 
+            "🎯 All Hits", 
+            "🧬 Reporter Hits",
+            "⚡ Vitality Hits", 
+            "🔬 Hit Calling",
+            "📈 Visualizations", 
+            "🔥 Heatmaps", 
+            "📋 QC Report"
+        ])
+    else:
+        summary_tab, hits_tab, viz_tab, heatmaps_tab, qc_tab = st.tabs([
+            "📊 Summary", 
+            "🎯 Hits", 
+            "📈 Visualizations", 
+            "🔥 Heatmaps", 
+            "📋 QC Report"
+        ])
+        reporter_hits_tab = None
+        vitality_hits_tab = None
+        hit_calling_tab = None  # No specialized tabs in standard mode
+    
+    # Get processed data
+    df = st.session_state.processed_data
+    edge_results = st.session_state.edge_results
+    summary = st.session_state.processing_summary
+    hit_calling_results = st.session_state.hit_calling_results
+    
+    # Summary Tab
+    with summary_tab:
+        st.header("Summary")
+        
+        if df is not None and len(df) > 0:
+            # Metrics row
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Plates", 
+                    summary.get('plate_count', 0),
+                    help="Number of plates processed"
+                )
+            
+            with col2:
+                st.metric(
+                    "Total Wells", 
+                    summary.get('total_wells', 0),
+                    help="Total number of wells across all plates"
+                )
+            
+            with col3:
+                missing_pct = 0
+                if summary.get('total_wells', 0) > 0:
+                    total_measurements = summary.get('total_wells', 0) * len(['BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA'])
+                    missing_measurements = df[['BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA']].isna().sum().sum()
+                    missing_pct = (missing_measurements / total_measurements) * 100
+                
+                st.metric(
+                    "Missing %", 
+                    f"{missing_pct:.1f}%",
+                    help="Percentage of missing measurements"
+                )
+                
+            # Hit Calling Summary (if multi-stage mode is enabled and results are available)
+            if st.session_state.multi_stage_enabled and hit_calling_results and any(col in df.columns for col in ['reporter_hit', 'vitality_hit', 'platform_hit']):
+                st.subheader("Hit Calling Summary")
+                
+                hit_col1, hit_col2, hit_col3, hit_col4 = st.columns(4)
+                
+                with hit_col1:
+                    reporter_hits = df['reporter_hit'].sum() if 'reporter_hit' in df.columns else 0
+                    reporter_rate = (reporter_hits / len(df)) * 100 if len(df) > 0 else 0
+                    st.metric(
+                        "Reporter Hits",
+                        f"{reporter_hits:,}",
+                        f"{reporter_rate:.1f}%",
+                        help="Stage 1: Z-score ≥ 2.0 AND viable"
+                    )
+                
+                with hit_col2:
+                    vitality_hits = df['vitality_hit'].sum() if 'vitality_hit' in df.columns else 0  
+                    vitality_rate = (vitality_hits / len(df)) * 100 if len(df) > 0 else 0
+                    st.metric(
+                        "Vitality Hits",
+                        f"{vitality_hits:,}",
+                        f"{vitality_rate:.1f}%", 
+                        help="Stage 2: Growth pattern analysis"
+                    )
+                
+                with hit_col3:
+                    platform_hits = df['platform_hit'].sum() if 'platform_hit' in df.columns else 0
+                    platform_rate = (platform_hits / len(df)) * 100 if len(df) > 0 else 0
+                    st.metric(
+                        "Platform Hits", 
+                        f"{platform_hits:,}",
+                        f"{platform_rate:.1f}%",
+                        help="Stage 3: Reporter AND Vitality"
+                    )
+                
+                with hit_col4:
+                    # Hit progression efficiency
+                    if reporter_hits > 0:
+                        progression_rate = (platform_hits / reporter_hits) * 100
+                        st.metric(
+                            "Progression Rate",
+                            f"{progression_rate:.1f}%", 
+                            help="Platform hits / Reporter hits"
+                        )
+                    else:
+                        st.metric("Progression Rate", "N/A", help="No reporter hits found")
+            
+            # Edge Effect Badge
+            st.subheader("Edge Effect Status")
+            if edge_results:
+                # Get the most severe warning level
+                max_warning = max(result.warning_level for result in edge_results)
+                st.markdown(render_edge_effect_badge(max_warning), unsafe_allow_html=True)
+                
+                # Expandable diagnostics
+                with st.expander("🔍 Edge Effect Diagnostics"):
+                    for result in edge_results:
+                        st.write(f"**Plate {result.plate_id} ({result.metric})**")
+                        
+                        diag_col1, diag_col2, diag_col3 = st.columns(3)
+                        with diag_col1:
+                            st.metric("Effect Size (d)", f"{result.effect_size_d:.3f}")
+                        with diag_col2:
+                            st.metric("Edge Wells", result.n_edge_wells)
+                        with diag_col3:
+                            st.metric("Interior Wells", result.n_interior_wells)
+                        
+                        if not np.isnan(result.row_correlation):
+                            st.write(f"Row trend correlation: {result.row_correlation:.3f}")
+                        if not np.isnan(result.col_correlation):
+                            st.write(f"Column trend correlation: {result.col_correlation:.3f}")
+                        
+                        # Corner effects
+                        corner_issues = [f"{k}: {v:.1f} MADs" for k, v in result.corner_deviations.items() 
+                                       if not np.isnan(v) and v > 1.2]
+                        if corner_issues:
+                            st.write("Corner effects:", ", ".join(corner_issues))
+                        
+                        st.divider()
+            else:
+                st.info("No edge effect analysis available. Process data first.")
+            
+            # Download buttons
+            st.subheader("Downloads")
+            download_col1, download_col2 = st.columns(2)
+            
+            with download_col1:
+                # Combined CSV download
+                csv_data = df.to_csv(index=False)
+                st.download_button(
+                    "📥 Download Combined CSV",
+                    csv_data,
+                    file_name="combined_plate_data.csv",
+                    mime="text/csv",
+                    help="Download all processed plate data as CSV"
+                )
+            
+            with download_col2:
+                # ZIP bundle download
+                if st.button("📦 Download ZIP Bundle"):
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        # Add CSV data
+                        zip_file.writestr("combined_data.csv", csv_data)
+                        
+                        # Add processing summary
+                        summary_yaml = yaml.dump(summary, default_flow_style=False)
+                        zip_file.writestr("processing_summary.yaml", summary_yaml)
+                        
+                        # Add edge effect results if available
+                        if edge_results:
+                            edge_data = []
+                            for result in edge_results:
+                                edge_data.append(result._asdict())
+                            edge_yaml = yaml.dump(edge_data, default_flow_style=False)
+                            zip_file.writestr("edge_effects.yaml", edge_yaml)
+                    
+                    st.download_button(
+                        "📥 Download ZIP Bundle",
+                        zip_buffer.getvalue(),
+                        file_name="plate_analysis_bundle.zip",
+                        mime="application/zip",
+                        help="Download complete analysis bundle with CSV, summary, and edge effects"
+                    )
+        else:
+            st.info("👆 Upload and process plate data to see summary metrics and edge effect diagnostics.")
+            
+            # Show sample data structure
+            st.subheader("Expected Data Structure")
+            sample_cols = ['PlateID', 'Well', 'Row', 'Col', 'BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA']
+            sample_data = pd.DataFrame({
+                col: ['Plate001', 'A01', 'A', '1', '1000', '2000', '800', '1500', '0.5', '0.3', '0.4'] if i == 0 
+                     else ['Plate001', 'A02', 'A', '2', '1200', '1800', '900', '1400', '0.6', '0.4', '0.5'] if i == 1
+                     else ['...'] * len(sample_cols)
+                for i, col in enumerate(sample_cols)
+            })
+            st.dataframe(sample_data, width='stretch')
+    
+    # Hits Tab  
+    with hits_tab:
+        st.header("Hits")
+        
+        if df is not None and len(df) > 0:
+            # Check if multi-stage hit calling data is available
+            has_multi_stage = any(col in df.columns for col in ['reporter_hit', 'vitality_hit', 'platform_hit'])
+            
+            # Controls
+            control_col1, control_col2, control_col3 = st.columns(3)
+            
+            with control_col1:
+                if has_multi_stage:
+                    hit_type = st.selectbox(
+                        "Hit Type:",
+                        ["Platform Hits", "Reporter Hits", "Vitality Hits", "Traditional Z-score"],
+                        help="Select which type of hits to display"
+                    )
+                else:
+                    hit_type = "Traditional Z-score"
+                    st.selectbox(
+                        "Hit Type:",
+                        ["Traditional Z-score"],
+                        disabled=True,
+                        help="Multi-stage hit calling not enabled or available"
+                    )
+            
+            with control_col2:
+                rank_by = st.selectbox(
+                    "Rank by:",
+                    ["Raw Z", "B-score"] if apply_b_scoring else ["Raw Z"],
+                    help="Metric to use for ranking hits"
+                )
+            
+            with control_col3:
+                display_top_n = st.number_input(
+                    "Display Top N:",
+                    min_value=10,
+                    max_value=min(1000, len(df)),
+                    value=min(top_n, len(df)),
+                    step=10
+                )
+            
+            # Filter and rank hits based on selected type
+            df_hits = df.copy()
+            
+            if hit_type == "Platform Hits" and 'platform_hit' in df.columns:
+                # Filter for platform hits
+                hits_df = df_hits[df_hits['platform_hit'] == True].copy()
+                hit_description = "platform hits (Reporter AND Vitality)"
+                
+            elif hit_type == "Reporter Hits" and 'reporter_hit' in df.columns:
+                # Filter for reporter hits
+                hits_df = df_hits[df_hits['reporter_hit'] == True].copy()
+                hit_description = "reporter hits (Z-score ≥ 2.0 AND viable)"
+                
+            elif hit_type == "Vitality Hits" and 'vitality_hit' in df.columns:
+                # Filter for vitality hits
+                hits_df = df_hits[df_hits['vitality_hit'] == True].copy()
+                hit_description = "vitality hits (growth pattern analysis)"
+                
+            else:
+                # Traditional Z-score based hit calling
+                # Determine ranking columns
+                if rank_by == "B-score" and apply_b_scoring:
+                    z_cols = ['B_Z_lptA', 'B_Z_ldtD']
+                    score_suffix = "B_"
+                else:
+                    z_cols = ['Z_lptA', 'Z_ldtD']
+                    score_suffix = ""
+                
+                # Calculate max absolute Z-score for ranking
+                if all(col in df_hits.columns for col in z_cols):
+                    df_hits['max_abs_z'] = df_hits[z_cols].abs().max(axis=1)
+                    hits_df = df_hits[df_hits['max_abs_z'] >= z_cutoff].copy()
+                    hit_description = f"potential hits (|Z| ≥ {z_cutoff})"
+                else:
+                    hits_df = df_hits.head(0)  # Empty DataFrame
+                    hit_description = "hits (missing Z-score columns)"
+            
+            # Rank hits by Z-score if available
+            if len(hits_df) > 0:
+                # Add ranking column for sorting
+                if rank_by == "B-score" and apply_b_scoring and all(col in hits_df.columns for col in ['B_Z_lptA', 'B_Z_ldtD']):
+                    hits_df['rank_score'] = hits_df[['B_Z_lptA', 'B_Z_ldtD']].abs().max(axis=1)
+                elif all(col in hits_df.columns for col in ['Z_lptA', 'Z_ldtD']):
+                    hits_df['rank_score'] = hits_df[['Z_lptA', 'Z_ldtD']].abs().max(axis=1)
+                else:
+                    hits_df['rank_score'] = 0
+                
+                hits_df = hits_df.sort_values('rank_score', ascending=False).head(display_top_n)
+            
+            # Display results
+            st.write(f"**Found {len(hits_df)} {hit_description}**")
+            
+            # Show stage progression for multi-stage hits
+            if has_multi_stage and len(df) > 0:
+                prog_col1, prog_col2, prog_col3, prog_col4 = st.columns(4)
+                
+                with prog_col1:
+                    total_wells = len(df)
+                    st.metric("Total Wells", f"{total_wells:,}")
+                    
+                with prog_col2:
+                    reporter_hits = df['reporter_hit'].sum() if 'reporter_hit' in df.columns else 0
+                    st.metric("Reporter Hits", f"{reporter_hits:,}")
+                    
+                with prog_col3:
+                    vitality_hits = df['vitality_hit'].sum() if 'vitality_hit' in df.columns else 0
+                    st.metric("Vitality Hits", f"{vitality_hits:,}")
+                    
+                with prog_col4:
+                    platform_hits = df['platform_hit'].sum() if 'platform_hit' in df.columns else 0
+                    st.metric("Platform Hits", f"{platform_hits:,}")
+            
+            if len(hits_df) > 0:
+                
+                # Prepare display columns based on hit type and available data
+                display_cols = []
+                
+                # Essential columns with fallbacks
+                essential_cols = [
+                    ('PlateID', ['PlateID', 'Plate_ID', 'plate_id']),
+                    ('Well', ['Well', 'WellID', 'well_id']),
+                    ('Ratio_lptA', ['Ratio_lptA']),
+                    ('Ratio_ldtD', ['Ratio_ldtD'])
+                ]
+                
+                for col_name, alternatives in essential_cols:
+                    for alt in alternatives:
+                        if alt in hits_df.columns:
+                            display_cols.append(alt)
+                            break
+                    else:
+                        # If Well column is missing, try to construct from Row/Col
+                        if col_name == 'Well' and 'Row' in hits_df.columns and 'Col' in hits_df.columns:
+                            display_cols.extend(['Row', 'Col'])
+                        elif col_name in ['Ratio_lptA', 'Ratio_ldtD', 'PlateID']:
+                            st.warning(f"Missing required column: {col_name}")
+                
+                # Add Z-score columns
+                if hit_type != "Traditional Z-score":
+                    # For multi-stage hits, show both raw and B-scores if available
+                    z_cols = ['Z_lptA', 'Z_ldtD']
+                    if apply_b_scoring:
+                        z_cols.extend(['B_Z_lptA', 'B_Z_ldtD'])
+                else:
+                    # For traditional hits, use the selected ranking columns
+                    if rank_by == "B-score" and apply_b_scoring:
+                        z_cols = ['B_Z_lptA', 'B_Z_ldtD']
+                    else:
+                        z_cols = ['Z_lptA', 'Z_ldtD']
+                
+                display_cols.extend(z_cols)
+                
+                # Add multi-stage hit calling columns if available
+                hit_calling_cols = []
+                if has_multi_stage:
+                    potential_hit_cols = ['reporter_hit', 'vitality_hit', 'platform_hit']
+                    hit_calling_cols = [col for col in potential_hit_cols if col in hits_df.columns]
+                    display_cols.extend(hit_calling_cols)
+                
+                # Add OD percentage columns for vitality analysis
+                if hit_type in ["Vitality Hits", "Platform Hits"] or has_multi_stage:
+                    od_pct_cols = [col for col in ['WT%', 'tolC%', 'SA%'] if col in hits_df.columns]
+                    display_cols.extend(od_pct_cols)
+                
+                # Add viability flags if available
+                viability_cols = [col for col in ['viable_lptA', 'viable_ldtD', 'viability_ok_lptA', 'viability_ok_ldtD'] if col in hits_df.columns]
+                display_cols.extend(viability_cols)
+                
+                # Filter to only existing columns and remove duplicates
+                existing_display_cols = list(dict.fromkeys([col for col in display_cols if col in hits_df.columns]))
+                
+                if not existing_display_cols:
+                    st.error("Cannot display hits: required columns are missing from processed data")
+                else:
+                    # Format the dataframe for display
+                    hits_display = hits_df[existing_display_cols].copy()
+                    
+                    # Drop the ranking score column if it exists (used only for sorting)
+                    if 'rank_score' in hits_display.columns:
+                        hits_display = hits_display.drop(columns=['rank_score'])
+                    
+                    # Round numeric columns
+                    numeric_cols = ['Ratio_lptA', 'Ratio_ldtD'] + [col for col in z_cols if col in hits_display.columns]
+                    if has_multi_stage:
+                        numeric_cols.extend([col for col in ['WT%', 'tolC%', 'SA%'] if col in hits_display.columns])
+                    
+                    for col in numeric_cols:
+                        if col in hits_display.columns and pd.api.types.is_numeric_dtype(hits_display[col]):
+                            if col in ['WT%', 'tolC%', 'SA%']:
+                                hits_display[col] = (hits_display[col] * 100).round(1)  # Convert to percentage
+                            else:
+                                hits_display[col] = hits_display[col].round(3)
+                    
+                    st.dataframe(hits_display, width='stretch', height=400)
+                    
+                    # Download top hits
+                    hits_csv = hits_display.to_csv(index=False)
+                    hit_type_filename = hit_type.lower().replace(" ", "_")
+                    st.download_button(
+                        f"📥 Download {hit_type} CSV ({len(hits_display)} hits)",
+                        hits_csv,
+                        file_name=f"{hit_type_filename}_hits_{len(hits_display)}.csv",
+                        mime="text/csv"
+                    )
+                
+            elif hit_type == "Traditional Z-score":
+                st.error(f"Required Z-score columns not found in processed data.")
+            else:
+                st.info(f"No {hit_type.lower()} found with current criteria.")
+        else:
+            st.info("👆 Process plate data first to identify potential hits.")
+            
+            if st.session_state.multi_stage_enabled:
+                st.subheader("Multi-Stage Hit Calling Workflow")
+                st.write("**Stage 1: Reporter Hits**")
+                st.write("- Z-score ≥ 2.0 for lptA OR ldtD")
+                st.write("- Must pass viability gate (ATP levels)")
+                st.write("")
+                st.write("**Stage 2: Vitality Hits**")
+                st.write("- Growth pattern analysis based on OD measurements")
+                st.write("- tolC% ≤ 80%, WT% > 80%, SA% > 80%")
+                st.write("")
+                st.write("**Stage 3: Platform Hits**")
+                st.write("- Compounds that pass BOTH Reporter AND Vitality criteria")
+                st.write("- Final candidates for follow-up studies")
+    
+    # Reporter Hits Tab - only show when multi-stage enabled
+    if reporter_hits_tab is not None:
+        with reporter_hits_tab:
+            st.header("🧬 Reporter Hits")
+            
+            if df is not None and len(df) > 0:
+                # Check if reporter hit data is available
+                if 'LumHit' in df.columns:
+                    reporter_hits_df = df[df['LumHit'] == True].copy()
+                    
+                    # Controls for Reporter Hits
+                    control_col1, control_col2 = st.columns(2)
+                    
+                    with control_col1:
+                        rank_by_reporter = st.selectbox(
+                            "Rank by:",
+                            ["Raw Z", "B-score"] if apply_b_scoring else ["Raw Z"],
+                            help="Metric to use for ranking reporter hits",
+                            key="reporter_rank_by"
+                        )
+                    
+                    with control_col2:
+                        display_top_n_reporter = st.number_input(
+                            "Display Top N:",
+                            min_value=10,
+                            max_value=min(1000, len(reporter_hits_df) if len(reporter_hits_df) > 0 else 100),
+                            value=min(100, len(reporter_hits_df) if len(reporter_hits_df) > 0 else 100),
+                            step=10,
+                            key="reporter_top_n"
+                        )
+                    
+                    # Display reporter hits summary
+                    total_wells = len(df)
+                    reporter_count = len(reporter_hits_df)
+                    reporter_rate = (reporter_count / total_wells * 100) if total_wells > 0 else 0
+                    
+                    st.write(f"**Found {reporter_count:,} reporter hits ({reporter_rate:.1f}% of {total_wells:,} wells)**")
+                    st.write("Reporter hits are compounds that show Z-score ≥ 2.0 for lptA OR ldtD **AND** pass viability gates (ATP levels).")
+                    
+                    if len(reporter_hits_df) > 0:
+                        # Rank hits by selected metric
+                        if rank_by_reporter == "B-score" and apply_b_scoring and all(col in reporter_hits_df.columns for col in ['B_Z_lptA', 'B_Z_ldtD']):
+                            reporter_hits_df['rank_score'] = reporter_hits_df[['B_Z_lptA', 'B_Z_ldtD']].abs().max(axis=1)
+                        elif all(col in reporter_hits_df.columns for col in ['Z_lptA', 'Z_ldtD']):
+                            reporter_hits_df['rank_score'] = reporter_hits_df[['Z_lptA', 'Z_ldtD']].abs().max(axis=1)
+                        else:
+                            reporter_hits_df['rank_score'] = 0
+                        
+                        reporter_hits_df = reporter_hits_df.sort_values('rank_score', ascending=False).head(display_top_n_reporter)
+                        
+                        # Prepare display columns for reporter hits
+                        display_cols = []
+                        
+                        # Essential columns
+                        essential_cols = [
+                            ('PlateID', ['PlateID', 'Plate_ID', 'plate_id']),
+                            ('Well', ['Well', 'WellID', 'well_id']),
+                            ('Ratio_lptA', ['Ratio_lptA']),
+                            ('Ratio_ldtD', ['Ratio_ldtD'])
+                        ]
+                        
+                        for col_name, alternatives in essential_cols:
+                            for alt in alternatives:
+                                if alt in reporter_hits_df.columns:
+                                    display_cols.append(alt)
+                                    break
+                            else:
+                                if col_name == 'Well' and 'Row' in reporter_hits_df.columns and 'Col' in reporter_hits_df.columns:
+                                    display_cols.extend(['Row', 'Col'])
+                        
+                        # Add Z-score columns
+                        if rank_by_reporter == "B-score" and apply_b_scoring:
+                            z_cols = ['B_Z_lptA', 'B_Z_ldtD', 'Z_lptA', 'Z_ldtD']  # Show both for comparison
+                        else:
+                            z_cols = ['Z_lptA', 'Z_ldtD']
+                            if apply_b_scoring:
+                                z_cols.extend(['B_Z_lptA', 'B_Z_ldtD'])  # Show B-scores too if available
+                        
+                        display_cols.extend(z_cols)
+                        
+                        # Add viability columns
+                        viability_cols = [col for col in ['viable_lptA', 'viable_ldtD'] if col in reporter_hits_df.columns]
+                        display_cols.extend(viability_cols)
+                        
+                        # Add hit calling flag
+                        display_cols.append('LumHit')
+                        
+                        # Filter to existing columns and remove duplicates
+                        existing_display_cols = list(dict.fromkeys([col for col in display_cols if col in reporter_hits_df.columns]))
+                        
+                        if existing_display_cols:
+                            # Format the dataframe for display
+                            reporter_display = reporter_hits_df[existing_display_cols].copy()
+                            
+                            # Drop the ranking score column if it exists
+                            if 'rank_score' in reporter_display.columns:
+                                reporter_display = reporter_display.drop(columns=['rank_score'])
+                            
+                            # Round numeric columns
+                            numeric_cols = ['Ratio_lptA', 'Ratio_ldtD'] + [col for col in z_cols if col in reporter_display.columns]
+                            for col in numeric_cols:
+                                if col in reporter_display.columns and pd.api.types.is_numeric_dtype(reporter_display[col]):
+                                    reporter_display[col] = reporter_display[col].round(3)
+                            
+                            st.dataframe(reporter_display, width='stretch', height=400)
+                            
+                            # Download reporter hits
+                            reporter_csv = reporter_display.to_csv(index=False)
+                            st.download_button(
+                                f"📥 Download Reporter Hits CSV ({len(reporter_display)} hits)",
+                                reporter_csv,
+                                file_name=f"reporter_hits_{len(reporter_display)}.csv",
+                                mime="text/csv"
+                            )
+                        else:
+                            st.error("Cannot display reporter hits: required columns are missing")
+                    else:
+                        st.info("No reporter hits found with current criteria.")
+                        st.write("**Reporter Hit Criteria:**")
+                        st.write("- Z-score ≥ 2.0 for lptA reporter OR ldtD reporter")
+                        st.write("- Must pass viability gate (ATP levels above threshold)")
+                        
+                else:
+                    st.info("Reporter hit data not available. Enable multi-stage hit calling mode to see reporter hits.")
+            else:
+                st.info("👆 Process plate data first to identify reporter hits.")
+
+    # Vitality Hits Tab - only show when multi-stage enabled  
+    if vitality_hits_tab is not None:
+        with vitality_hits_tab:
+            st.header("⚡ Vitality Hits")
+            
+            if df is not None and len(df) > 0:
+                # Check if vitality hit data is available
+                if 'OMpatternOK' in df.columns:
+                    vitality_hits_df = df[df['OMpatternOK'] == True].copy()
+                    
+                    # Controls for Vitality Hits
+                    control_col1, control_col2 = st.columns(2)
+                    
+                    with control_col1:
+                        sort_by_vitality = st.selectbox(
+                            "Sort by:",
+                            ["tolC% (ascending)", "WT% (descending)", "SA% (descending)"],
+                            help="Metric to use for sorting vitality hits",
+                            key="vitality_sort_by"
+                        )
+                    
+                    with control_col2:
+                        display_top_n_vitality = st.number_input(
+                            "Display Top N:",
+                            min_value=10,
+                            max_value=min(1000, len(vitality_hits_df) if len(vitality_hits_df) > 0 else 100),
+                            value=min(100, len(vitality_hits_df) if len(vitality_hits_df) > 0 else 100),
+                            step=10,
+                            key="vitality_top_n"
+                        )
+                    
+                    # Display vitality hits summary
+                    total_wells = len(df)
+                    vitality_count = len(vitality_hits_df)
+                    vitality_rate = (vitality_count / total_wells * 100) if total_wells > 0 else 0
+                    
+                    st.write(f"**Found {vitality_count:,} vitality hits ({vitality_rate:.1f}% of {total_wells:,} wells)**")
+                    st.write("Vitality hits show the desired growth pattern: **tolC% ≤ 80%** (inhibited), **WT% > 80%** AND **SA% > 80%** (surviving).")
+                    
+                    if len(vitality_hits_df) > 0:
+                        # Sort hits by selected metric
+                        if sort_by_vitality == "tolC% (ascending)" and 'tolC%' in vitality_hits_df.columns:
+                            vitality_hits_df = vitality_hits_df.sort_values('tolC%', ascending=True).head(display_top_n_vitality)
+                        elif sort_by_vitality == "WT% (descending)" and 'WT%' in vitality_hits_df.columns:
+                            vitality_hits_df = vitality_hits_df.sort_values('WT%', ascending=False).head(display_top_n_vitality)
+                        elif sort_by_vitality == "SA% (descending)" and 'SA%' in vitality_hits_df.columns:
+                            vitality_hits_df = vitality_hits_df.sort_values('SA%', ascending=False).head(display_top_n_vitality)
+                        else:
+                            vitality_hits_df = vitality_hits_df.head(display_top_n_vitality)
+                        
+                        # Prepare display columns for vitality hits
+                        display_cols = []
+                        
+                        # Essential columns
+                        essential_cols = [
+                            ('PlateID', ['PlateID', 'Plate_ID', 'plate_id']),
+                            ('Well', ['Well', 'WellID', 'well_id'])
+                        ]
+                        
+                        for col_name, alternatives in essential_cols:
+                            for alt in alternatives:
+                                if alt in vitality_hits_df.columns:
+                                    display_cols.append(alt)
+                                    break
+                            else:
+                                if col_name == 'Well' and 'Row' in vitality_hits_df.columns and 'Col' in vitality_hits_df.columns:
+                                    display_cols.extend(['Row', 'Col'])
+                        
+                        # Add OD percentage columns (key for vitality analysis)
+                        od_pct_cols = [col for col in ['WT%', 'tolC%', 'SA%'] if col in vitality_hits_df.columns]
+                        display_cols.extend(od_pct_cols)
+                        
+                        # Add raw OD measurements for reference
+                        od_raw_cols = [col for col in ['OD_WT', 'OD_tolC', 'OD_SA'] if col in vitality_hits_df.columns]
+                        display_cols.extend(od_raw_cols)
+                        
+                        # Add hit calling flag
+                        display_cols.append('OMpatternOK')
+                        
+                        # Add Z-scores if available (for context)
+                        if apply_b_scoring and all(col in vitality_hits_df.columns for col in ['B_Z_lptA', 'B_Z_ldtD']):
+                            display_cols.extend(['B_Z_lptA', 'B_Z_ldtD'])
+                        elif all(col in vitality_hits_df.columns for col in ['Z_lptA', 'Z_ldtD']):
+                            display_cols.extend(['Z_lptA', 'Z_ldtD'])
+                        
+                        # Filter to existing columns and remove duplicates
+                        existing_display_cols = list(dict.fromkeys([col for col in display_cols if col in vitality_hits_df.columns]))
+                        
+                        if existing_display_cols:
+                            # Format the dataframe for display
+                            vitality_display = vitality_hits_df[existing_display_cols].copy()
+                            
+                            # Convert OD percentages to percentage format and round
+                            for col in od_pct_cols:
+                                if col in vitality_display.columns and pd.api.types.is_numeric_dtype(vitality_display[col]):
+                                    vitality_display[col] = (vitality_display[col] * 100).round(1)
+                            
+                            # Round other numeric columns
+                            numeric_cols = [col for col in ['Z_lptA', 'Z_ldtD', 'B_Z_lptA', 'B_Z_ldtD', 'OD_WT', 'OD_tolC', 'OD_SA'] if col in vitality_display.columns]
+                            for col in numeric_cols:
+                                if col in vitality_display.columns and pd.api.types.is_numeric_dtype(vitality_display[col]):
+                                    if col.startswith('OD_'):
+                                        vitality_display[col] = vitality_display[col].round(3)
+                                    else:
+                                        vitality_display[col] = vitality_display[col].round(3)
+                            
+                            st.dataframe(vitality_display, width='stretch', height=400)
+                            
+                            # Download vitality hits
+                            vitality_csv = vitality_display.to_csv(index=False)
+                            st.download_button(
+                                f"📥 Download Vitality Hits CSV ({len(vitality_display)} hits)",
+                                vitality_csv,
+                                file_name=f"vitality_hits_{len(vitality_display)}.csv",
+                                mime="text/csv"
+                            )
+                            
+                            # Show vitality criteria summary
+                            if len(od_pct_cols) >= 3:
+                                st.subheader("Vitality Criteria Summary")
+                                criteria_col1, criteria_col2, criteria_col3 = st.columns(3)
+                                
+                                with criteria_col1:
+                                    avg_tolC = vitality_display['tolC%'].mean() if 'tolC%' in vitality_display.columns else 0
+                                    st.metric("Avg tolC%", f"{avg_tolC:.1f}%", help="Should be ≤ 80% (inhibited)")
+                                
+                                with criteria_col2:
+                                    avg_WT = vitality_display['WT%'].mean() if 'WT%' in vitality_display.columns else 0
+                                    st.metric("Avg WT%", f"{avg_WT:.1f}%", help="Should be > 80% (surviving)")
+                                
+                                with criteria_col3:
+                                    avg_SA = vitality_display['SA%'].mean() if 'SA%' in vitality_display.columns else 0
+                                    st.metric("Avg SA%", f"{avg_SA:.1f}%", help="Should be > 80% (surviving)")
+                        else:
+                            st.error("Cannot display vitality hits: required columns are missing")
+                    else:
+                        st.info("No vitality hits found with current criteria.")
+                        st.write("**Vitality Hit Criteria:**")
+                        st.write("- tolC% ≤ 80% (tolC strain growth inhibited)")
+                        st.write("- WT% > 80% (wild-type strain survives)")  
+                        st.write("- SA% > 80% (SA strain survives)")
+                        
+                else:
+                    st.info("Vitality hit data not available. Enable multi-stage hit calling mode to see vitality hits.")
+            else:
+                st.info("👆 Process plate data first to identify vitality hits.")
+    
+    # Hit Calling Tab - only show when multi-stage enabled
+    if hit_calling_tab is not None:
+        with hit_calling_tab:
+            st.header("Hit Calling Analysis")
+            
+            if df is not None and len(df) > 0 and st.session_state.multi_stage_enabled:
+                # Show hit calling analysis and statistics
+                if hit_calling_results:
+                    st.subheader("Hit Calling Summary")
+                    
+                    # Display summary statistics
+                    summary_stats = hit_calling_results.get('summary', {})
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        total_wells = summary_stats.get('total_wells', 0)
+                        st.metric("Total Wells", f"{total_wells:,}")
+                        
+                    with col2:
+                        reporter_hits = summary_stats.get('reporter_hits', 0)
+                        reporter_rate = summary_stats.get('reporter_hit_rate', 0) * 100
+                        st.metric("Reporter Hits", f"{reporter_hits:,}", f"{reporter_rate:.1f}%")
+                        
+                    with col3:
+                        vitality_hits = summary_stats.get('vitality_hits', 0)
+                        vitality_rate = summary_stats.get('vitality_hit_rate', 0) * 100
+                        st.metric("Vitality Hits", f"{vitality_hits:,}", f"{vitality_rate:.1f}%")
+                        
+                    with col4:
+                        platform_hits = summary_stats.get('platform_hits', 0)
+                        platform_rate = summary_stats.get('platform_hit_rate', 0) * 100
+                        st.metric("Platform Hits", f"{platform_hits:,}", f"{platform_rate:.1f}%")
+                    
+                    # Stage progression visualization
+                    if summary_stats:
+                        st.subheader("Hit Calling Stage Progression")
+                        
+                        progression_data = {
+                            'Stage': ['Total Wells', 'Reporter Hits', 'Vitality Hits', 'Platform Hits'],
+                            'Count': [
+                                summary_stats.get('total_wells', 0),
+                                summary_stats.get('reporter_hits', 0),
+                                summary_stats.get('vitality_hits', 0),
+                                summary_stats.get('platform_hits', 0)
+                            ]
+                        }
+                        
+                        fig_progression = px.bar(
+                            progression_data,
+                            x='Stage',
+                            y='Count',
+                            title='Hit Calling Stage Progression',
+                            color='Stage',
+                            color_discrete_sequence=['lightblue', 'orange', 'lightgreen', 'red']
+                        )
+                        st.plotly_chart(fig_progression, width='stretch')
+                    
+                    # Hit analysis report
+                    st.subheader("Analysis Report")
+                    from analytics.hit_calling import format_hit_calling_report
+                    report_text = format_hit_calling_report(hit_calling_results)
+                    st.text_area("Hit Calling Report", report_text, height=300)
+                    
+                else:
+                    st.info("Hit calling analysis will appear here after processing data with multi-stage mode enabled.")
+            else:
+                st.info("Enable multi-stage hit calling mode and process data to see hit calling analysis.")
+    
+    # Visualizations Tab
+    with viz_tab:
+        st.header("Visualizations")
+        
+        if df is not None and len(df) > 0:
+            # Create 2x2 grid
+            viz_col1, viz_col2 = st.columns(2)
+            
+            with viz_col1:
+                # Histogram of Raw Z_lptA
+                st.subheader("Raw Z_lptA Distribution")
+                if 'Z_lptA' in df.columns:
+                    fig1 = px.histogram(
+                        df, 
+                        x='Z_lptA', 
+                        nbins=50,
+                        title="Raw Z_lptA Distribution",
+                        color_discrete_sequence=['steelblue']
+                    )
+                    fig1.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
+                    fig1.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
+                    st.plotly_chart(fig1, width='stretch')
+                else:
+                    st.warning("Z_lptA column not available")
+            
+            with viz_col2:
+                # Histogram of B_Z_lptA (if available)
+                st.subheader("B-score Z_lptA Distribution")
+                if apply_b_scoring and 'B_Z_lptA' in df.columns:
+                    fig2 = px.histogram(
+                        df, 
+                        x='B_Z_lptA', 
+                        nbins=50,
+                        title="B-score Z_lptA Distribution",
+                        color_discrete_sequence=['orange']
+                    )
+                    fig2.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
+                    fig2.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
+                    st.plotly_chart(fig2, width='stretch')
+                elif apply_b_scoring:
+                    st.warning("B_Z_lptA column not available")
+                else:
+                    st.info("B-scoring not enabled")
+            
+            # Second row
+            viz_col3, viz_col4 = st.columns(2)
+            
+            with viz_col3:
+                # Scatter plot of ratios
+                st.subheader("Ratio Correlation")
+                if all(col in df.columns for col in ['Ratio_lptA', 'Ratio_ldtD', 'PlateID']):
+                    fig3 = px.scatter(
+                        df,
+                        x='Ratio_lptA',
+                        y='Ratio_ldtD',
+                        color='PlateID',
+                        title="Ratio_lptA vs Ratio_ldtD",
+                        hover_data=['Well'] if 'Well' in df.columns else None
+                    )
+                    st.plotly_chart(fig3, width='stretch')
+                else:
+                    st.warning("Required ratio columns not available")
+            
+            with viz_col4:
+                # Viability counts by plate
+                st.subheader("Viability by Plate")
+                if 'viable_lptA' in df.columns and 'PlateID' in df.columns:
+                    viability_counts = df.groupby('PlateID')['viable_lptA'].value_counts().unstack(fill_value=0)
+                    
+                    fig4 = px.bar(
+                        x=viability_counts.index,
+                        y=[viability_counts[True], viability_counts[False]],
+                        title="Viability Counts by Plate",
+                        labels={'x': 'PlateID', 'y': 'Count'},
+                        color_discrete_map={0: 'lightcoral', 1: 'lightblue'}
+                    )
+                    fig4.update_layout(showlegend=True)
+                    st.plotly_chart(fig4, width='stretch')
+                else:
+                    st.warning("Viability data not available")
+        else:
+            st.info("👆 Process plate data first to see visualizations.")
+    
+    # Heatmaps Tab
+    with heatmaps_tab:
+        st.header("Heatmaps")
+        
+        if df is not None and len(df) > 0 and 'PlateID' in df.columns:
+            # Controls
+            heatmap_col1, heatmap_col2 = st.columns(2)
+            
+            with heatmap_col1:
+                # Metric selection
+                available_metrics = []
+                for metric in ['Z_lptA', 'Z_ldtD', 'B_Z_lptA', 'B_Z_ldtD', 'Ratio_lptA', 'Ratio_ldtD', 'OD_norm_WT', 'OD_norm_tolC', 'OD_norm_SA']:
+                    if metric in df.columns:
+                        available_metrics.append(metric)
+                
+                selected_metric = st.selectbox(
+                    "Metric:",
+                    available_metrics,
+                    help="Select metric to visualize in heatmap"
+                )
+            
+            with heatmap_col2:
+                # Plate selection
+                plate_ids = sorted(df['PlateID'].unique())
+                selected_plate = st.selectbox(
+                    "Plate:",
+                    plate_ids,
+                    help="Select plate to visualize"
+                )
+            
+            if selected_metric and selected_plate:
+                # Create side-by-side heatmaps
+                heatmap_col_left, heatmap_col_right = st.columns(2)
+                
+                with heatmap_col_left:
+                    # Selected metric heatmap
+                    fig_main = create_plate_heatmap(df, selected_metric, selected_plate)
+                    st.plotly_chart(fig_main, width='stretch')
+                
+                with heatmap_col_right:
+                    # Comparison metric (alternate between Z and B-score if available)
+                    comparison_metric = None
+                    if selected_metric == 'Z_lptA' and 'B_Z_lptA' in df.columns:
+                        comparison_metric = 'B_Z_lptA'
+                    elif selected_metric == 'B_Z_lptA' and 'Z_lptA' in df.columns:
+                        comparison_metric = 'Z_lptA'
+                    elif selected_metric == 'Z_ldtD' and 'B_Z_ldtD' in df.columns:
+                        comparison_metric = 'B_Z_ldtD'
+                    elif selected_metric == 'B_Z_ldtD' and 'Z_ldtD' in df.columns:
+                        comparison_metric = 'Z_ldtD'
+                    elif 'Ratio_lptA' in df.columns and selected_metric != 'Ratio_lptA':
+                        comparison_metric = 'Ratio_lptA'
+                    
+                    if comparison_metric:
+                        fig_comparison = create_plate_heatmap(df, comparison_metric, selected_plate)
+                        st.plotly_chart(fig_comparison, width='stretch')
+                    else:
+                        st.info("No suitable comparison metric available")
+        else:
+            st.info("👆 Process plate data first to see heatmaps.")
+    
+    # QC Report Tab
+    with qc_tab:
+        st.header("QC Report")
+        
+        if df is not None and len(df) > 0:
+            st.write("**Quality Control Report Generation**")
+            
+            # Report options
+            report_col1, report_col2 = st.columns(2)
+            
+            with report_col1:
+                include_formulas = st.checkbox("Include Formulas", value=True)
+                include_methodology = st.checkbox("Include Methodology", value=True)
+            
+            with report_col2:
+                include_edge_effects = st.checkbox("Include Edge Effects", value=bool(edge_results))
+                include_bscore_details = st.checkbox("Include B-score Details", value=apply_b_scoring)
+            
+            if st.button("📋 Generate PDF Report"):
+                with st.spinner("Generating QC report..."):
+                    # Create report manifest
+                    manifest = {
+                        'report_date': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'plates_processed': summary.get('plate_count', 0),
+                        'total_wells': summary.get('total_wells', 0),
+                        'viability_threshold': viability_threshold,
+                        'z_cutoff': z_cutoff,
+                        'b_scoring_applied': apply_b_scoring,
+                        'edge_effects_detected': len([r for r in edge_results if r.warning_level != WarningLevel.INFO]) if edge_results else 0,
+                        'sections_included': {
+                            'formulas': include_formulas,
+                            'methodology': include_methodology,
+                            'edge_effects': include_edge_effects,
+                            'bscore_details': include_bscore_details
+                        }
+                    }
+                    
+                    # Display manifest
+                    st.subheader("Report Manifest")
+                    st.code(yaml.dump(manifest, default_flow_style=False), language='yaml')
+                    
+                    # For now, create a comprehensive text report
+                    # (PDF generation would require additional libraries like reportlab)
+                    report_sections = []
+                    
+                    # Header
+                    report_sections.append("# Plate Data Processing QC Report")
+                    report_sections.append(f"Generated: {manifest['report_date']}")
+                    report_sections.append("")
+                    
+                    # Summary
+                    report_sections.append("## Summary")
+                    report_sections.append(f"- Plates processed: {manifest['plates_processed']}")
+                    report_sections.append(f"- Total wells: {manifest['total_wells']}")
+                    report_sections.append(f"- Viability threshold: {manifest['viability_threshold']}")
+                    report_sections.append(f"- Z-score cutoff: {manifest['z_cutoff']}")
+                    report_sections.append(f"- B-scoring applied: {manifest['b_scoring_applied']}")
+                    report_sections.append("")
+                    
+                    # Edge effects
+                    if include_edge_effects and edge_results:
+                        report_sections.append("## Edge Effects Analysis")
+                        for result in edge_results:
+                            report_sections.append(f"### Plate {result.plate_id}")
+                            report_sections.append(f"- Warning level: {result.warning_level.value}")
+                            report_sections.append(f"- Effect size (d): {result.effect_size_d:.3f}")
+                            report_sections.append(f"- Edge wells: {result.n_edge_wells}")
+                            report_sections.append(f"- Interior wells: {result.n_interior_wells}")
+                            if not np.isnan(result.row_correlation):
+                                report_sections.append(f"- Row correlation: {result.row_correlation:.3f}")
+                            if not np.isnan(result.col_correlation):
+                                report_sections.append(f"- Column correlation: {result.col_correlation:.3f}")
+                            report_sections.append("")
+                    
+                    # Formulas
+                    if include_formulas:
+                        report_sections.append("## Calculation Formulas")
+                        report_sections.append("### Ratios")
+                        report_sections.append("- Ratio_lptA = BG_lptA / BT_lptA")
+                        report_sections.append("- Ratio_ldtD = BG_ldtD / BT_ldtD")
+                        report_sections.append("")
+                        report_sections.append("### Robust Z-scores")
+                        report_sections.append("- Z = (value - median) / (1.4826 × MAD)")
+                        report_sections.append("- MAD = median(|values - median(values)|)")
+                        report_sections.append("")
+                        if apply_b_scoring:
+                            report_sections.append("### B-scores")
+                            report_sections.append("- Median-polish row/column bias correction")
+                            report_sections.append("- Followed by robust scaling using MAD")
+                            report_sections.append("")
+                    
+                    # Methodology
+                    if include_methodology:
+                        report_sections.append("## Methodology")
+                        report_sections.append("This analysis follows the plate data processing pipeline:")
+                        report_sections.append("1. Data validation and column mapping")
+                        report_sections.append("2. Ratio calculations (BG/BT)")
+                        report_sections.append("3. Robust Z-score calculation using median and MAD")
+                        report_sections.append("4. Viability gating based on ATP levels")
+                        if apply_b_scoring:
+                            report_sections.append("5. B-scoring for row/column bias correction")
+                        report_sections.append("6. Edge effect detection and quality assessment")
+                        report_sections.append("")
+                    
+                    report_text = "\n".join(report_sections)
+                    
+                    # Offer download
+                    st.download_button(
+                        "📥 Download Text Report",
+                        report_text,
+                        file_name=f"qc_report_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                        mime="text/plain"
+                    )
+                    
+                    st.success("Report generated successfully!")
+        else:
+            st.info("👆 Process plate data first to generate QC report.")
+
+
+if __name__ == "__main__":
+    main()

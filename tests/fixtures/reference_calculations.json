@@ -1,0 +1,82 @@
+{
+  "input_data": [
+    {
+      "BG_lptA": 1000.0,
+      "BT_lptA": 500.0,
+      "BG_ldtD": 1200.0,
+      "BT_ldtD": 400.0,
+      "OD_WT": 1.0,
+      "OD_tolC": 0.8,
+      "OD_SA": 1.2
+    },
+    {
+      "BG_lptA": 2000.0,
+      "BT_lptA": 1000.0,
+      "BG_ldtD": 2400.0,
+      "BT_ldtD": 800.0,
+      "OD_WT": 2.0,
+      "OD_tolC": 1.6,
+      "OD_SA": 2.4
+    },
+    {
+      "BG_lptA": 1500.0,
+      "BT_lptA": 750.0,
+      "BG_ldtD": 1800.0,
+      "BT_ldtD": 600.0,
+      "OD_WT": 1.5,
+      "OD_tolC": 1.2,
+      "OD_SA": 1.8
+    }
+  ],
+  "expected_ratios": {
+    "Ratio_lptA": [
+      2.0,
+      2.0,
+      2.0
+    ],
+    "Ratio_ldtD": [
+      3.0,
+      3.0,
+      3.0
+    ]
+  },
+  "expected_od_norms": {
+    "OD_WT_norm": [
+      0.6666666666666666,
+      1.3333333333333333,
+      1.0
+    ],
+    "OD_tolC_norm": [
+      0.6666666666666667,
+      1.3333333333333335,
+      1.0
+    ],
+    "OD_SA_norm": [
+      0.6666666666666666,
+      1.3333333333333333,
+      1.0
+    ]
+  },
+  "statistics": {
+    "ratio_lptA_median": 2.0,
+    "ratio_lptA_mad": 0.0,
+    "ratio_ldtD_median": 3.0,
+    "ratio_ldtD_mad": 0.0
+  },
+  "viability_thresholds": {
+    "f_03": {
+      "bt_lptA_threshold": 225.0,
+      "bt_ldtD_threshold": 180.0,
+      "expected_viable_lptA": [
+        true,
+        true,
+        true
+      ],
+      "expected_viable_ldtD": [
+        true,
+        true,
+        true
+      ]
+    }
+  }
+}

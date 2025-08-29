@@ -1,0 +1,970 @@
+﻿
+We are IntechOpen,
+
+the world’s leading Open Access
+
+publisher of books
+
+Built by scientists, for scientists
+
+
+
+
+
+
+7,500 Open access books available
+
+
+
+
+
+
+154 Countries delivered to
+
+196,000 International  authors and editors
+
+
+
+
+
+Our authors are among the
+TOP 1% most cited scientists
+
+215M Downloads
+
+
+
+
+
+
+14% Contributors from top 500 universities
+
+
+
+
+
+
+
+
+
+
+
+Selection of our books indexed in the Book Citation Index in Web of Science™ Core Collection (BKCI)
+
+
+Interested in publishing with us? Contact book.department@intechopen.com
+
+
+Numbers displayed above are based on latest data collected. For more information visit www.intechopen.com
+
+Chapter 7
+
+
+
+Data Analysis Approaches in High Throughput Screening
+
+
+
+Asli N. Goktug, Sergio C. Chai and Taosheng Chen
+
+Additional information is available at the end of the chapter
+
+http://dx.doi.org/10.5772/52508
+
+
+
+
+
+1. Introduction
+
+
+With the advances in biotechnology, identification of new therapeutic targets, and better un‐ derstanding of human diseases, pharmaceutical companies and academic institutions have accelerated their efforts in drug discovery. The pipeline to obtain therapeutics often involves target identification and validation, lead discovery and optimization, pre-clinical animal studies, and eventually clinical trials to test the safety and effectiveness of the new drugs. In most cases, screening using genome-scale RNA interference (RNAi) technology or diverse compound libraries comprises the first step of the drug discovery initiatives. Small interfer‐ ing RNA (siRNA, a class of double-stranded RNA molecules 20-25 nucleotides in length ca‐ pable of interfering with the expression of specific genes with complementary nucleotide sequence) screen is an effective tool to identify upstream or downstream regulators of a spe‐ cific target gene, which may also potentially serve as drug targets for a more efficient and successful  treatment.  On  the  other  hand,  screening  of  diverse  small  molecule  libraries against a known target or disease-relevant pathway facilitates the discovery of chemical tools as candidates for further development.
+
+Conducting either genome-wide RNAi or small molecule screens has become possible with the advances in high throughput (HT) technologies, which are indispensible to carry out massive screens in a timely manner (Macarron 2006; Martis et al. 2011; Pereira and Williams 2007). In screening campaigns, large quantities of data are collected in a considerably short period of time, making rapid data analysis and subsequent data mining a challenging task (Harper and Pickett 2006). Numerous automatic instruments and operational steps partici‐ pate in an HT screening process, requiring appropriate data processing tools for data quality assessment and statistical analysis. In addition to quality control (QC) and “hit” selection strategies, pre- and post-processing of the screening data are essential steps in a comprehen‐
+
+
+
+© 2013 Goktug et al.; licensee InTech. This is an open access article distributed under the terms of the Creative Commons Attribution License (http://creativecommons.org/licenses/by/3.0), which permits unrestricted use, distribution, and reproduction in any medium, provided the original work is properly cited.
+202	Drug Discovery
+
+
+
+sive HT operation for subsequent interpretation and annotation of the large data sets. In this chapter, we review statistical data analysis methods developed to meet the needs for han‐ dling large datasets generated from HT campaigns. We first discuss the influence of proper assay design on statistical outcomes of the HT screening data. We then highlight similarities and differences among various methods for data normalization, quality assessment and “hit” selection. Information presented here provides guidance to researchers on the major aspects of high throughput screening data interpretation.
+
+
+
+2. Role of statistics in HT screening design
+
+2.1. HT screening process
+
+A typical HT screening campaign can be divided into five major steps regardless of the as‐ say type and the assay read-out (Fig. 1). Once target or pathway is identified, assay develop‐ ment is performed to explore the optimal assay conditions, and to miniaturize the assay to a microtiter plate format. Performance of an HT assay is usually quantified with statistical pa‐ rameters such as signal window, signal variability and Z-factor (see definition in section 4). To achieve acceptable assay performances, one should carefully choose the appropriate re‐ agents, experimental controls and numerous other assay variables such as cell density or protein/substrate concentrations.
+
+The final distribution of the activities from a screening data set depends highly on the target and pathway (for siRNA) or the diversity of the compound libraries, and efforts have been continuously made to generate more diverse libraries (Entzeroth et al. 2009; Gillet 2008; Kummel and Parker 2011; Zhao et al. 2005). Furthermore, the quality and reliability of the screening data is affected by the stability and the purity of the test samples in the screening libraries, where storage conditions should be monitored and validated in a timely manner (Baillargeon et al. 2011; Waybright et al. 2009). For small molecules, certain compounds might interfere with the detection system by emitting fluorescence or by absorbing light, and they should be avoided whenever possible to obtain reliable screening results.
+
+Assay development is often followed by a primary screen, which is carried out at a single con‐ centration (small molecule) or single point measurements (siRNA). As the “hits” identified in the primary screen are followed-up in a subsequent confirmatory screen, it is crucial to opti‐ mize the assay to satisfactory standards. Sensitivity - the ability to identify an siRNA or com‐ pound as a “hit” when it is a true “hit”, and specificity - the ability to classify an siRNA or compoundasa“non-hit”whenitisnotatrue“hit”,aretwocriticalaspectstoidentifyasmany candidateswhileminimizingfalsediscoveryrates.Specificityiscommonlyemphasizedinthe confirmatory screens which follow the primary screens. For instance, the confirmatory screen for small molecules often consists of multiple measurements of each compound’s activity at variousconcentrationsusingdifferentassayformatstoassessthecompound’spotencyandse‐ lectivity.TheconfirmatorystageofanRNAiscreenusingpooledsiRNAmaybeperformedina deconvolutionmode,whereeachwellcontainsasinglesiRNA.Poolingstrategyisalsoapplica‐ ble to primary small molecule screens, where a keen pooling design is necessary (Kainkaryam
+Data Analysis Approaches in High Throughput Screening	203 http://dx.doi.org/10.5772/52508
+
+
+andWoolf2009).Theconfirmatoryscreensofcompoundsidentifiedfromsmallmoleculelibra‐ ries are followed by lead optimization efforts involving structure-activity relationship investi‐ gations and molecular scaffold clustering. Pathway and genetic clustering analysis, on the other hand, are widespread hit follow-up practices for RNAi screens. The processes encom‐ passinghitidentificationfromprimaryscreensandleadoptimizationmethodsrequirepower‐ fulsoftwaretoolswithadvancedstatisticalcapabilities.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figure 1. The HT screening process.
+
+Accuracy and precision of an assay are also critical parameters to consider for a successful campaign. While accuracy is a measurement of how close a measured value is to its true val‐ ue, precision is the proximity of the measured values to each other. Therefore, accuracy of an assay is highly dependent on the performance of the HT instruments in use. Precision, on the other hand, can be a function of sample size and control performances as well as instru‐ ment specifications, indicating that the experimental design has a significant impact on the statistical evaluation of the screening data.
+
+2.2. Classical versus robust (resistant) statistics
+
+One of the main assumptions when analyzing HT screening data is that the data is normally distributed, or it complies with the central limit theorem, where the mean of the distributed values converge to normal distribution unless there are systematic errors associated with the screen (Coma et al. 2009). Therefore, log transformations are often applied to the data in the pre-processing stage to achieve more symmetrically distributed data around the mean as in a normal distribution, to represent the relationship between variables in a more linear way especially for cell growth assays, and to make an efficient use of the assay quality assess‐ ment parameters (Sui and Wu 2007).
+204	Drug Discovery
+
+
+
+In HT screening practices, the presence of outliers - data points that do not fall within the range of the rest of the data - is generally experienced. Distortions to the normal distribution of the data caused by outliers impact the results negatively. Therefore, an HT data set with outliers needs to be analyzed carefully to avoid an unreliable and inefficient “hit” selection process. Although outliers in control wells can be easily identified, it should be clear that outliers in the test sample may be misinterpreted as real “hits” instead of random errors.
+
+There are two approaches for statistical analysis of data sets with outliers: classical and ro‐ bust. One can choose to replace or remove outliers based on the truncated mean or similar approaches, and continue the analysis process with classical methods. However, robust stat‐ istical approaches have gained popularity in HT screening data analysis in recent decades. In robust statistics, median and median absolute deviation (MAD) are utilized as statistical parameters as opposed to mean and standard deviation (std), respectively, to diminish the effect of outliers on the final analysis results. Although there are numerous approaches to detect and abolish/replace outliers with statistical methods (Hund et al. 2002; Iglewicz and Hoaglin 1993; Singh 1996), robust statistics is preferred for its insensitivity to outliers (Huber 1981). In statistics, while the robustness of an analysis technique can be determined by two main approaches, i.e. influence functions (Hampel et al. 1986) and breakdown point (Ham‐ pel 1971), the latter is a more intuitive technique in the concept of HT screening, where the breakdown point of a sample series is defined as the amount of outlier data points that can be tolerated by the statistical parameters before the parameters take on drastically different values that are not representing anymore distribution of the original dataset. In a demon‐ strated example on a five sample data set, robust parameters were shown to perform superi‐ or to the classical parameters after the data set was contaminated with outliers (Rousseeuw 1991). It was also emphasized that median and MAD have a breakdown point of 50%, while mean and std have 0%, indicating that sample sets with 50% outlier density can still be suc‐ cessfully handled with robust statistics.
+
+2.3. False discovery rates
+
+As mentioned previously, depending on the specificity and sensitivity of an HT assay, erro‐ neous  assessment  of  “hits”  and  “non-hits”  is  likely.  Especially  in  genome-wide  siRNA screens, false positive and negative results may mislead the scientists in the confirmatory studies. While the cause of false discovery results may be due to indirect biological regula‐ tions of the gene of interest through other pathways that are not in the scope of the experi‐ ment, it may also be due to random errors experienced in the screening process. Although the latter can be easily resolved in the follow-up screens, the former may require a better assay design (Stone et al. 2007). Lower false discovery rates can also be achieved by careful selection of assay reagents to avoid inconsistent measurements (outliers) during screening. The biological interference effects of the reagents in RNAi screens can be considered in two categories: sequence-dependent and sequence-independent (Echeverri et al. 2006; Mohr and Perrimon 2012). Therefore, off-target effects and low transfection efficiencies are the main challenges to be overcome in these screens. Moreover, selection of the appropriate controls for either small molecule or RNAi screens is very crucial for screen quality assessment as
+Data Analysis Approaches in High Throughput Screening	205 http://dx.doi.org/10.5772/52508
+
+
+well as for “hit” selection, so that the false discovery rates can be inherently reduced. Posi‐ tive controls are often chosen from small-molecule compounds or gene silencing agents that are known to have the desired effect on the target of interest; however, this may be a diffi‐ cult task if very little is known about the biological process (Zhang et al. 2008a). On the other hand, selection of negative controls from non-targeting reagents is more challenging due to higher potential of biological off-target effects in RNAi screens compared to the negative controls used in small-molecule screens (Birmingham et al. 2009). Another factor that might interfere with the biological process in an HT screening assay is the bioactive contaminants that may be released from the consumables used in the screening campaign, such as plastic tips and microplates (McDonald et al. 2008; Watson et al. 2009). Unreliable and misleading screening results may be obtained from altered assay conditions caused by leached materi‐ als, and boosted false discovery rates may be unavoidable. Hence, the effects of laboratory consumables on the assay readout should be carefully examined during assay development.
+
+The false discovery rates are also highly dependent on the analysis methods used for “hit” selection, and they can be statistically controlled. False discovery rate is defined as the ratio of false discoveries to the total number of discoveries. A t-test and the associated p value are often used for hypothesis testing in a single experiment and can be interpreted as the false positive discovery rate (Chen et al. 2010). However, the challenge arises when multiple hy‐ pothesis testing is needed or when the comparison of results across multiple experiments is required. For HT applications, a Bayesian approach was developed to enable plate-wise and experiment-wise comparison of results in a single process, while the false discovery rates can still be controlled (Zhang et al. 2008b). Another method utilizing the strictly standar‐ dized mean difference (SSMD) parameter was proven to control the false discovery and non-discovery rates in RNAi screens (Zhang 2007a; Zhang 2010 b; Zhang et al. 2010). By tak‐ ing the data variability into account, SSMD method is capable of determining “hits” with higher assurance compared to the Z-score and t-test methods.
+
+
+
+3. Normalization and systematic error corrections
+
+3.1. Normalization for assay variability
+
+Despite meticulous assay optimization efforts considering all the factors mentioned previ‐ ously, it is expected to observe variances in the raw data across plates even within the same experiment. Here, we consider these variances as “random” assay variability, which is sepa‐ rate from the systematic errors that can be linked to a known reason, such as failure of an instrument. Uneven assay performances may unpredictably occur at any given time during screening. Hence, normalization of data within each plate is necessary to enable comparable results across plates or experiments allowing a single cut-off for the selection of “hits”.
+
+When normalizing the HT screening data, two main approaches can be followed: controls-based and non-controls-based. In controls-based approaches, the assay-specific in-plate pos‐ itive and negative controls are used as the upper (100%) and lower (0%) bounds of the assay activity, and the activities of the test samples are calculated with respect to these values. Al‐
+206	Drug Discovery
+NPI=
+x100
+
+
+
+though, it is an intuitive and easily interpretable method, there are several concerns with the use of controls for normalization purposes. With controls-based methods, too high or too low variability in the control wells does not necessarily represent the variability in the sam‐ ple wells, and the outliers and biases within the control wells might impair the upper and lower activity bounds (Brideau et al. 2003; Coma et al. 2009). Therefore, non-control-based normalizations  are  favored  for  better  understanding  of  the  overall  activity  distribution based on the sample activities per se. In this method, most of the samples are assumed to be inactive in order to serve as their own “negative controls”. However, this approach may be misleading when the majority of the wells in a plate consist of true “hits” (such as screening a library of bioactive molecules) or siRNAs (e.g., focused library). Since the basal activity level would shift upwards under these conditions, non-controls-based method would result in erroneous decision making.
+
+Plate-wise  versus  experiment-wise  normalization  and  “hit”  picking  is  another  critical point to consider when choosing the best fitting analysis technique for a screen. Experi‐ ment-wise normalizations are advantageous in screens where active samples are clustered within certain plates. In this case, each plate is processed in the context of all plates in the experiment. On the other hand, plate-wise normalizations can effectively correct systemat‐ ic  errors  occurring  in  a  plate-specific  manner  without  disrupting  the  results  in  other plates (Zhang et al. 2006). Therefore, the normalization method that fits best with one’s experimental results should be carefully chosen to perform efficient “hit” selection with low false discovery rates.
+
+The calculation used in the most common controls-based normalization methods are as follows:
+
+•  Percent of control (PC): Activity of the ith  sample (Si) is divided by the mean of either the positive or negative control wells (C).
+
+
+PC= mean(C) x100	(1)
+S
+i
+
+
+•  Normalized percent inhibition (NPI): Activity of the ith sample is normalized to the activi‐ ty of positive and negative controls. The sample activity is subtracted from the high con‐ trol (Chigh) which is then divided by the difference between mean of the low control (Clow) and the mean of the high control. This parameter may be termed normalized percent ac‐ tivity if the final result is subtracted from 100. Additionally, control means may be pref‐ erably substituted with the medians.
+
+
+mean(Chigh)-Si mean(Chigh)-mean(Clow)
+
+
+(2)
+
+
+The calculation used in the most common non-controls-based normalization methods are as follows.
+Data Analysis Approaches in High Throughput Screening	207 http://dx.doi.org/10.5772/52508
+
+
+•  Percent of samples (PS): The mean of the control wells in the PC parameter (only when negative control is the control of interest) is replaced with the mean of all samples (Sall).
+
+PS= mean(Sall) x100	(3)
+S
+i
+
+•  Robust percent of samples (RPS): In order to desensitize the PS calculation to the outliers, robust statistics approach is preferred, where mean of Sall  in PS calculation is replaced with the median of Sall.
+
+RPS= median(Sall) x100	(4)
+S
+i
+
+
+Assay Variability Normalization
+
+Percent of control
+
+S
+Controls-based
+i
+PC=  mean(C) x100
+
+Normalized percent inhibition
+mean(Chigh)-Si mean(Chigh)-mean(Clow)
+x100
+NPI=
+
+
+
+Median polish
+Non-controls-based
+rijp=Sijp-µp-rowi-colj
+^
+^
+^
+
+B-score
+
+r
+ijp
+B-score= MADp
+
+Percent of samples
+
+S
+Non-controls-based
+i
+PS=  mean(Sall) x100
+
+Robust
+percent of samples
+
+S
+i
+RPS=  median(Sall) x100
+
+Systematic Error Corrections
+BZ-score
+
+r    - mean((r    )    ) BZ-score=	std((rijp)all)
+ijp	ijp
+all
+
+Background correction
+
+zij= N   ∑  Sijp
+N
+1
+'
+p= 1
+
+Z-score
+
+S -mean(S    )
+i	all
+Z-score=	std(Sall)
+
+Robust Z-score
+
+S -median S
+i	all
+(    )
+Robust Z-score=	MAD(Sall) MAD(Sall)=1.4826xmedian(|Si-median(Sall)|)
+
+
+
+Well-correction
+
+
+Diffusion state model
+(can be controls-based too)
+
+
+Table 1. Summary of HT screening data normalization methods.
+
+•  Z-score: Unlike the above parameters, this method accounts for the signal variability in the sample wells by dividing the difference of Si  and the mean of Sall  by the std of Sall. Z-score is a widely used measure to successfully correct for additive and multiplicative off‐ sets between plates in a plate-wise approach (Brideau et al. 2003).
+
+Z-score= Si-meana(lSl all)	(5)
+std(S   )
+
+•  Robust Z-score: Since Z-score calculation is highly affected by outliers, robust version of Z-score is available for calculations insensitive to outliers. In this parameter, the mean and std are replaced with median and MAD, respectively.
+
+Robust Z-score= Si-mediana(lSl all)	(6)
+MAD S
+(	)
+208	Drug Discovery
+
+
+
+MAD(Sall)=1.4826 x median(|Si-median(Sall)|)	(7)
+
+3.2. Normalization for systematic errors
+
+Besides the data variability between plates due to random fluctuations in assay perform‐ ance, systematic errors are one of the major concerns in HT screening. For instance plate-wise  spatial  patterns  play  a  crucial  role  in  cell-based  assay  failures.  As  an  example, incubation conditions might be adjusted to the exact desired temperature and humidity set‐ tings, but the perturbed air circulations inside the incubator unit might cause an uneven temperature gradient, resulting in different cell-growth rates in each well due to evapora‐ tion issues. Therefore, depending on the positions of the plates inside the incubator, column-wise, row-wise or bowl-shape edge effects may be observed within plates (Zhang 2008b; Zhang 2011b). On the other hand, instrumental failures such as inaccurate dispensing of re‐ agents from individual dispenser channels might cause evident temporal patterns in the fi‐ nal readout. Therefore, experiment-wise patterns should be carefully examined via proper visual tools. Although some of these issues might be fixed at the validation stage such as performing routine checks to test the instrument performances, there are numerous algo‐ rithms developed to diminish these patterns during data analysis, and the most common ones are listed as follows and summarized in Table 1.
+
+•  Median polish: Tukey’s two-way median polish (Tukey 1977) is utilized to calculate the row and column effects within plates using a non-controls-based approach. In this meth‐ od, the row and column medians are iteratively subtracted from all wells until the maxi‐ mum tolerance value is reached for the row and column medians as wells as for the row and column effects. The residuals in pth  plate (rijp) are then calculated by subtracting the estimated plate average (µp), ith  row effect (rowi) and jth  column effect (colj) from the true sample value (Sijp). Since median parameter is used in the calculations, this method is rela‐ tively insensitive to outliers.
+^	^	^
+
+rijp=Sijp-µp-rowi-colj	(8)
+^	^	^
+
+•  B-score: This is a normalization parameter which involves the residual values calculated from median polish and the sample MAD to account for data variability. The details of median polish technique and an advanced B-score method, which accounts for plate-to-plate variances by smoothing are provided in (Brideau et al. 2003).
+
+
+B-score=MADp	(9)
+r
+ijp
+
+MADp= 1.4826 x median(|(rijp)all- median((rijp)all)|)	(10)
+
+•  BZ-score: This is a modified version of the B-score method, where the median polish is followed by Z-score calculations. While BZ-score is more advantageous to Z-score be‐
+Data Analysis Approaches in High Throughput Screening	209 http://dx.doi.org/10.5772/52508
+
+
+cause of its capability to correct for row and column effects, it is less powerful than B-score and does not fit very well with the normal distribution model (Wu et al. 2008).
+
+
+BZ-score=rijp-smean((rij))all)	(11)
+p
+ijp
+td((r   )
+all
+
+
+•  Background correction: In this correction method, the background signal corresponding to eachwelliscalculatedbyaveragingtheactivitieswithineachwell(S’ijp representingthenor‐ malizedsignalofawellinith rowandjth columninpth plate)acrossallplates.Then,apolyno‐ mial fitting is performed to generate an experiment-wise background surface for a single screeningrun.Theoffsetofthebackgroundsurfacefromazeroplaneisconsideredtobethe consequenceofpresentsystematicerrors,andthecorrectionisperformedbysubtractingthe background surface from each plate data in the screen. The background correction per‐ formed on pre-normalized data was found to be more efficient, and exclusion of the control wellswasrecommendedinthebackgroundsurfacecalculations.Thedetaileddescriptionof thealgorithmisfoundin(KevorkovandMakarenkov2005).
+
+
+zij=N p= 1 Sijp	(12)
+∑
+N
+1
+'
+
+
+•  Well-correction: This method follows an analogous strategy to the background correction method; however, a least-squares approximation or polynomial fitting is performed inde‐ pendently for each well across all plates. The fitted values are then subtracted from each data point to obtain the corrected data set. In a study comparing the systematic error cor‐ rection methods discussed so far, well-correction method was found to be the most effec‐ tive for successful “hit” selection (Makarenkov et al. 2007).
+
+•  Diffusion-state model: As mentioned previously, the majority of the spatial effects are caused by uneven temperature gradients across assay plates due to inefficient incubation conditions. To predict the amount of evaporation in each well in a time and space de‐ pendent manner, and its effect on the resulting data set, a diffusion-state model was de‐ veloped by (Carralot et al. 2012). As opposed to the above mentioned correction methods, the diffusion model can be generated based on the data from a single control column in‐ stead of sample wells. The edge effect correction is then applied to each plate in the screening run based on the generated model.
+
+Before automatically applying a systematic error correction algorithm on the raw data set, it should be carefully considered whether there is a real need for such data manipulation. To de‐ tect the presence of systematic errors, several statistical methods were developed (Coma et al. 2009; Rootet al. 2003).In a demonstratedstudy, theassessmentof row andcolumneffects was performedbasedonarobustlinearmodel,socalledRscore,anditwasshownthatperforming apositionalcorrectionusingRscoreonthedatathathasnoorverysmallspatialeffectsresults inlowerspecificity.However,correctingadatasetwithlargespatialeffectsdecreasesthefalse discoveryratesconsiderably(Wuetal.2008).Inthesamestudy,receiveroperatingcharacteris‐
+210	Drug Discovery
+S/B=
+
+
+
+tics (ROC) curves were generated to compare the performance of several positional correction algorithms based on sensitivity and “1-specificity” values, and R-score was found to be the mostsuperior.Ontheotherhand,applicationofwell-correctionordiffusionmodelondatasets withnospatialeffectswasshowntohavenoadverseeffectonthefinal“hit”selection(Carralot et al. 2012;Makarenkov et al. 2007).Additionally, reductionof thermal gradients andassociat‐ ed edge effects in cell-based assays was shown to be possible by easy adjustments to the assay workflow,suchasincubatingtheplatesatroomtemperaturefor1hourimmediatelyafterdis‐ pensingthecellsintothewells(Lundholtetal.2003).
+
+
+
+4. QC methods
+
+
+There are various environmental, instrumental and biological factors that contribute to as‐ say performance in an HT setting. Therefore, one of the key steps in the analysis of HT screening data is the examination of the assay quality. To determine if the data collected from each plate meet the minimum quality requirements, and if any patterns exist before and after data normalization, the distribution of control and test sample data should be ex‐ amined at experiment-, plate- and well-level. While there are numerous graphical methods and tools available for the visualization of the screening data in various formats (Gribbon et al. 2005; Gunter et al. 2003; Wu and Wu 2010), such as scatter plots, heat maps and frequen‐ cy plots, there are also many statistical parameters for the quantitative assessment of assay quality. Same as for the normalization techniques, both controls-based and non-controls-based approaches exist for data QC methods. The most commonly-used QC parameters in HT screening are listed as follows and summarized in Table 2.
+
+•  Signal-to-background (S/B): This is a simple measure of the ratio of the positive control mean to the background signal mean (i.e. negative control).
+
+
+mean(Cpos) mean(Cneg)
+
+
+(13)
+
+
+•  Signal-to-noise (S/N): This is a similar measure to S/B with the inclusion of signal variabil‐ ity in the formulation. Two alternative versions of S/N are presented below. Both S/B and S/N are considered week parameters to represent dynamic signal range for an HT screen and are rarely used.
+
+S/N= mean(Cpos)-mean(Cneg)(a)
+(	)
+std C
+S/N= msetadn(CCppooss)2-+mnsetegdanC(Cnengeg2)(b)	(14)
+(	)	(	)
+Data Analysis Approaches in High Throughput Screening	211 http://dx.doi.org/10.5772/52508
+AVR=
+
+
+•  Signal window (SW): This is a more indicative measure of the data range in an HT assay than the above parameters. Two alternative versions of the SW are presented below, which only differ by denominator.
+
+
+SW= mean(Cpos)-mean(Cneg)-3x(std(Cpos)+std(Cneg))(a)
+pos
+(	)
+(	)
+(	)
+std C
+std C
+SW= mean(Cpos)-mean(Cneg)-3x std(Cpos)+std(Cneg) (b) neg
+
+
+
+
+
+(15)
+
+
+
+•  Assay variability ratio (AVR): This parameter captures the data variability in both con‐ trols as opposed to SW, and can be defined as (1-Z’-factor) as presented below.
+
+
+3 x std(Cpos) + 3 x std(Cneg) |mean(Cpos) - mean(Cneg)|
+
+
+(16)
+
+
+•  Z’-factor: Despite of the fact that AVR and Z’-factor has similar statistical properties, the latter is the most widely used QC criterion, where the separation between positive (Cpos) and negative (Cneg) controls is calculated as a measure of the signal range of a particular assay in a single plate. Z’-factor has its basis on normality assumption, and the use of 3 std’s of the mean of the group comes from the 99.73% confidence limit (Zhang  et  al.  1999).  While  Z’-factor  accounts  for  the  variability  in  the  control  wells, positional  effects  or  any  other  variability  in  the  sample  wells  are  not  captured.  Al‐ though  Z’-factor  is  an  intuitive  method  to  determine  the  assay  quality,  several  con‐ cerns were raised about the reliability of this parameter as an assay quality measure. Major issues associated with the Z’-factor method are that the magnitude of the Z’-fac‐ tor does not necessarily correlate with the hit confirmation rates, and that Z’-factor is not an appropriate measure to compare the assay quality across different screens and assay types (Coma et al. 2009; Gribbon et al. 2005).
+
+
+Z'-factor=1 - 3 x std(Cpos) + 3 xastd(Cgeg)	(17)
+)
+pos	n
+|
+mean C	- me  n C
+ne
+(	(	)|
+
+
+•  Z-factor: This is the modified version of the Z’-factor, where the mean and std of the negative control are substituted with the ones for the test samples. Although Z-factor is more advantageous than Z’-factor due to its ability to incorporate sample variabili‐ ty in the calculations, other issues associated with Z’-factor (as discussed above) still apply. Additionally, in a focused library in which many possible “hits” are clustered in  certain  plates,  Z-factor  would  not  be  an  appropriate  QC  parameter.  While  assays with Z’- or Z-factor values above 0.5 are considered to be excellent, one may want to include additional measures, such as visual inspection or more advanced formulations
+212	Drug Discovery
+Z-factor=1 -
+
+
+
+in  the  decision  process,  especially  for  cell-based  assays  with  inherently  high  signal variability. The power of the above mentioned parameters were discussed in multiple studies  (Gribbon  et  al.  2005;  Iversen  et  al.  2006;  Macarron  and  Hertzberg  2009;  Ste‐ vens et al. 1998).
+
+
+
+3 x std(Cpos) + 3 x std(Sall) |mean(Cpos) - mean(Sall)|
+
+
+(18)
+
+
+
+•  SSMD: It is an alternative quality metric to Z’- and Z-factor, which was recently devel‐ oped to assess the assay quality in HT screens (Zhang 2007a; Zhang 2007b). Due to its ba‐ sis on probabilistic and statistical theories, SSMD was shown to be a more meaningful parameter than previously mentioned methods for QC purposes. SSMD differs from Z’-and Z-factor by its ability to handle controls with different effects, which enables the se‐ lection of multiple QC criteria for assays (Zhang et al. 2008a). The application of SSMD-based  QC  criterion  was  demonstrated  in  multiple  studies  in  comparison  to  other commonly-used methods (Zhang 2008b; Zhang 2011b; Zhang et al. 2008a). Although SSMD was developed primarily for RNAi screens, it can also be used for small molecule screens.
+
+
+SSMD= mean(Cpos) + mean(Cneg)
+std Cpos  2+ std Cneg  2
+(	)	(	)
+
+
+(19)
+
+
+
+
+Signal-to-background (S/B)
+
+
+
+Signal-to-noise (S/N)
+
+
+
+
+
+Signal window (SW)
+
+
+
+Assay variability ratio (AVR)
+
+
+Z’-factor
+
+
+Z-factor
+
+
+SSMD
+
+mean(Cpos) mean(Cneg)
+
+mean(Cpos)- mean(Cneg) std(Cneg)
+or
+mean(Cpos)- mean(Cneg) std(Cpos)2+ std(Cneg)2
+
+|mean(Cpos)-mean(Cneg)|- 3 x (std(Cpos)+ std(Cneg)) std(Cpos)
+or
+|mean(Cpos)-mean(Cneg)|- 3 x (std(Cpos)+ std(Cneg)) std(Cneg)
+
+3 x std C	+ 3 x std C
+pos	neg
+(	)	(	)
+|mean(Cpos) - mean(Cneg)|   = 1 - Z'-factor
+
+3 x std(Cpos) + 3 x std(Cneg) |mean(Cpos) - mean(Cneg)|
+1 -
+
+3 x std(Cpos) + 3 x std(Sall) |mean(Cpos) - mean(Sall)|
+1 -
+
+mean(Cpos) - mean(Cneg)
+std(Cpos)2+ std(Cneg)2
+
+
+
+Table 2. Summary of HT screening data QC methods.
+Data Analysis Approaches in High Throughput Screening	213 http://dx.doi.org/10.5772/52508
+
+
+5. “Hit” selection methods
+
+
+ThemainpurposeofHTscreensistoobtainalistofcompoundsorsiRNAswithdesirableactiv‐ ityforfurtherconfirmation.Therefore,theultimategoalofanHTscreeningcampaignistonar‐ row down a big and comprehensive compound or siRNA library to a manageable number of “hits” with low false discovery rates. While the initial library of test samples undergoes multi‐ plephasesofelimination,themostcriticalfactoristoselectasmanytrue“hits”aspossible.Af‐ ter data normalization is applied as necessary, “hit” selection is performed on the plates that pass the QC criterion. As stated previously in Section 2.1, HT processes in primary and confir‐ matory screens differ in design. The “hit” selection process following a primary screen is simi‐ lar for RNAi and small-molecule screens, where the screening run is often performed in single copy,andasingledatapoint(obtainedfromeitherendpointorkineticreading)iscollectedfor each sample. On the other hand, a confirmatory RNAi screen is typically performed in repli‐ cates using pooled or individual siRNA, while the confirmatory small-molecule screens are executed in dose-response mode. Here, we classify the “hit” selection methodologies in two majorcategories:primaryandconfirmatoryscreenanalysis.
+
+5.1. “Hit” selection in primary screen
+
+AlthoughRNAiandsmallmoleculeassaysdifferinmanyways,acommonaimistoclassifythe testsampleswithrelativelyhigherorloweractivitiesthanthereferencewellsas“hits”.Hence, itisrequiredtoselectanactivitycut-off,wheretestsampleswithvaluesaboveorbelowthecut-offareidentifiedas“hits”.Itisverycrucialtoselectasensiblecut-offvaluewithenoughdiffer‐ encefromthenoiselevelinordertoreducefalsepositiverates.Dependingonthespecificgoals oftheprojects,thecut-offmightneedtobeareasonablevaluethatleadstoamanageablequan‐ tityof“hits”forfollow-upstudies.Toguidescientistsintheprocess,numerous“hit”selection methodshavebeendevelopedforHTscreensaspresentedbelow.
+
+•  Percent inhibition cut-off: The “hits” from HT screening data that is normalized for per‐ cent inhibition (NPI method in Section 3.1) can be selected based on a percent cut-off val‐ ue that is arbitrarily assigned relative to an assay’s signal window. As this method does not have much statistical basis to it, it is primarily preferred for small molecule screens with strong controls.
+
+•  Mean +/- k std: In this method, cut-off is set to the value that is k std’s above or below the sample mean. While the cut-off can be applied to the normalized data, a k value of 3 is typically used, which is associated with the false positive error rate of 0.00135 (Zhang et al. 2006). As this cut-off calculation method is primarily based on normality assumption, it is also equivalent to a Z-score of 3. Since the use of mean and std make this method sensitive to outliers, a more robust version is presented next.
+
+•  Median +/- k MAD: To desensitize the “hit” selection to outliers, a cut-off that is k MADs above or below the sample median was developed, and a study comparing the std- and MAD-based “hit” selection methods showed lower false non-discovery rates with the lat‐ ter (Chung et al. 2008).
+214	Drug Discovery
+
+
+
+•  Quartile-based method: Similar to the previous approaches, the quartile-based “hit” selec‐ tion method is based on the idea of treating the true “hits” as outliers and identifying them by setting upper and lower cut-off boundaries based on the quartiles and interquar‐ tiles of the data. The major advantage of the quartile-based method over median +/- k MAD is its more effective cut-off calculation formulation for non-symmetrical data, where upper and lower cut-offs can be determined independently. In the comparison of the three “hit” selection criteria presented so far, the quartile-based method outperformed the other two methods to detect true “hits” with moderate effects (Zhang et al. 2006).
+
+•  SSMD and Robust SSMD: This parameter has become a widely-used method for RNAi screening data analysis mainly due to its ability to quantify RNAi effects with a statistical basis, and its better control on false negative and false positive rates (Zhang 2007a; Zhang 2007b; Zhang 2009; Zhang 2010a; Zhang 2010 b; Zhang 2011b; Zhang et al. 2010). SSMD is a robust parameter to capture the magnitude of the RNAi effects with various sample sizes. This scoring method also provides comparison of values across screens. Mean and std in the standard SSMD formula is substituted with median and MAD in the robust ver‐ sion. The SSMD parameter used for the primary screens without replicates holds a linear relationship with the Z-score method.
+
+•  Bayesian method: This method is used to combine both plate-wise and experiment-wise information within single “hit” selection calculation based on Bayesian hypothesis testing (Zhang et al. 2008b). Bayesian statistics incorporates a prior data distribution and a likeli‐ hood function to generate a posterior distribution function. In HT screening data analysis using this method, the experiment- and plate-wise information is incorporated into the prior and likelihood functions, respectively. With the availability of various prior distri‐ bution models, the Bayesian method can be applied either with positive and negative con‐ trols or with test sample wells. As this method enables the control of false discovery rates, it is a more powerful “hit” selection measure than the median +/- k MAD when the sam‐ ple data is used to generate the prior distribution.
+
+5.2. “Hit” selection in confirmatory screen
+
+Different strategies are pursued for the confirmation of “hits” from RNAi and small mole‐ cule primary screens. While dose response screens are very common to test the compound activities in a dose-dependent manner in small molecule screens, this is not applicable to RNAi screens. Here, we will present the “hit” selection methods for screens with replicates in two categories: dose-response analysis and others.
+
+5.2.1. Dose-response analysis
+
+After running a primary screen, in which a single concentration of compound is used, a sub‐ set of compounds is selected for a more quantitative assessment. These molecules are tested at various concentrations and plotted against the corresponding assay response. These types of curves are commonly referred to as “dose-response” or “concentration-response” curves, and they are generally defined by four parameters: top asymptote (maximal response), bot‐ tom asymptote (baseline response), slope (Hill slope or Hill coefficient), and the EC50 value.
+Data Analysis Approaches in High Throughput Screening	215 http://dx.doi.org/10.5772/52508
+
+
+A plot of signal as a function of concentration results in a rectangular hyperbola when the hill coefficient is 1 (Fig. 2A). Because the concentration range covers several orders of magni‐ tude, the x-axis is normally displayed in the logarithm scale, resulting in a sigmoidal curve (Fig. 2B), which is generally fitted with the Hill equation:
+T-B
+50
+(	)
+
+
+
+signal=B+		EC	h 1+    x
+
+
+(20)
+
+
+The most accepted benchmark for drug potency is the EC50  value, which corresponds to the concentration of compound (x) that generates a signal midway between the top (T) and bot‐ tom (B) asymptotes (Fig. 2B). The steepness is indicated by the Hill slope (h), also known as the Hill coefficient or the slope factor (Fig. 2C).
+
+It is preferable to apply the Hill equation to concentrations on a logarithmic scale, because the error associated with the EC50  (log form) follows a Gaussian distribution (Motulsky and Neubig 2010), as indicated in Eq. 21. The x values represent log[compound].
+T-B
+50
+(	)
+h
+
+
+
+signal=B+	Log  EC
+1+  10   10x
+
+
+(21)
+
+
+
+In biochemical experiments, a Hill coefficient of 1 is indicative of a 1:1 stoichiometry of en‐ zyme-inhibitor or protein-ligand complexes. Under such condition, an increase from 10% to 90% response requires 81-fold change in compound concentration. Hill coefficient values that deviate from unity could reflect mechanistic implications (such as cooperativity or mul‐ tiple binding sites) or non-ideal behavior of the compound (acting as protein denaturant or causing micelle formation) (Copeland 2005).
+
+For  symmetrical  curves,  the  inflection  point  corresponds  to  the  relative  EC50    value, which lies halfway between the asymptotes. This relative EC50  may be different from the actual EC50   if the top and bottom plateaus do not accurately represent 0% and 100% re‐ sponse. For instance, in Fig. 2D, the midpoint in the black curve dictates a value of 60% based on the positive and negative controls. When using the relative EC50, careful analy‐ sis  of  data  fitting  is  necessary  to  avoid  deceptive  results,  as  exemplified  by  the  green curve  in  Fig.  2D.  Curve  fitting  would  provide  a  relative  EC50   value  of  1  for  both  the green and black curves, but based on controls, the compound associated with the green curve  would  inhibit  the  assay  only  by  20%.  Therefore,  it  is  argued  that  the  best  ap‐ proach is to use a two-parameter curve fit, where only two parameters are allowed to float  (EC50   and  Hill  coefficient  values),  while  fixing  the  top  and  bottom  boundaries  as presented in Fig. 2E. (Copeland 2005).
+
+Although EC50   is normally the main criterion to categorize compounds for downstream analysis, the value is highly dependent on assay conditions, such as cell number and en‐ zyme/substrate amount (Copeland 2003). For enzymatic assays, a more attractive approach is to consider relative affinities. Cheng and Prusoff formulated a way to convert EC50  values
+216	Drug Discovery
+
+
+
+to dissociation constants, thus reducing the overload of performing multiple titrations asso‐ ciated with standard enzyme kinetics (Cheng and Prusoff 1973). Nevertheless, the caveat of using this convenient alternative is to recognize the inhibitory modality of the compounds (Copeland 2005): competitive (Eq. 22), non-competitive (Eq. 23) and uncompetitive (Eq. 24).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figure 2. Dose-response curves. A) Response vs. compound concentration resulting in a rectangular hyperbola curve. B) Response vs. logarithm of compound concentration resulting in a sigmoidal curve. The dashed lines indicate the concentration corresponding to half-maximal signal. C) Curves at different Hill slopes: 0.5 (black, closed circles), 1 (red, open circles), 2 (blue, closed squares), 3 (green, open squares) and -1 (pink, closed triangles). D) Relative (blue dash lines) and actual (red dash lines) EC50  values for a curve with different top boundary from that of the control (black curve). The green and black curves have the same relative EC50. E) The red curve fits the data points (black circles) al‐ lowing 2 parameters (EC50, hill coefficient) to float, while the blue curve fits the data refining all 4 parameters (EC50, hill coefficient, top and bottom asymptotes). F) Curves corresponding to a full agonist (red), partial agonist (black), antag‐ onist (green) and inverse agonist (blue).
+Data Analysis Approaches in High Throughput Screening	217 http://dx.doi.org/10.5772/52508
+
+EC50=Ki(1+KM )	(22)
+S
+
+
+EC50= K  S+KMS	(23) Ki	α×Ki
+M
++
+
+EC50=α×Ki(1+  S  )	(24)
+K
+M
+
+
+The dissociation constant of a reversible compound (Ki) can be calculated based on a single substrate concentration (S) and the Michaelis constant (KM). The constant α delineates the ef‐ fect of inhibitor binding on the affinity of the substrate for the enzyme. It becomes evident that EC50  and Ki  are roughly the same at much lower substrate concentration relative to KM (Eq. 22) or when α=1 (Eq. 23).
+
+Dose-response  curves  can  follow  various  patterns,  depending  on  the  biological  system to  be  investigated.  For  assays  with  certain  basal  level,  increasing  concentrations  of  a full  agonist  triggers  a  maximal  response  for  the  system  (Fig.  2F,  red  curve).  A  partial agonist  displays  a  reduced  response  (efficacy)  relative  to  a  full  agonist  (Fig.  2F,  black curve), even though they both exhibit the same potency (i.e. same EC50   values). An an‐ tagonist  might  have  certain  affinity  or  potency,  but  it  would  not  show  any  change  in basal activity as the efficacy has a value of zero (Fig. 2F, green curve). However, an an‐ tagonist  reverses  the  actions  of  an  agonist.  In  pharmacological  terms,  the  effects  of  a competitive  antagonist  can  be  overcome  by  augmenting  the  amount  of  agonist,  but such  agonist  increment  has  no  effect  on  the  effects  of  non-competitive  antagonists.  In‐ verse  agonists  reduce  the  basal  response  of  systems  with  constitutive  activity  (Fig.  2F, blue curve).
+
+5.2.2. Other methods
+
+In  “hit”  selection  for  confirmatory  screens  with  single  concentration  of  compound  or siRNA, hypothesis testing is a commonly-used method to incorporate sample variabili‐ ty of each sample from its replicates. Therefore, confirmatory screens (or some primary screens)  are  chosen  to  be  performed  in  replicates  to  statistically  calculate  the  signifi‐ cance of the sample activity in relation to a negative reference group. Since previously listed  Z-  and  robust  Z-score  methods  assume  that  the  variability  of  the  test  samples and the negative controls or references is equal, it is not a reliable measure for confir‐ matory screens with replicates, where the sample variability can be individually calcu‐ lated.  The  most  common  methods  to  analyze  screening  data  with  replicates  are  listed below.
+
+•  t-test: For “hit” selection in confirmatory screens, t statistics and the associated p val‐ ue is used to calculate if a sample compound or siRNA is behaving significantly dif‐ ferent than the majority of the test samples or controls. A t-test determines whether
+218	Drug Discovery
+
+
+
+the null hypothesis, which is the mean of a test sample being equal to the mean of the negative reference group, is accepted or not. Paired t-test (first pairing of the test sample  and  reference  value  within  each  plate,  then  calculating  t  statistic  on  the paired values) is often preferred to avoid the distortion of results due to inter-plate variability, whereas unpaired t-test is used for global comparison of the sample repli‐ cates with all reference values in the experiment (Zhang 2011a). The p value calculat‐ ed  from  t  statistic  is  then  used  to  determine  the  significance  of  the  sample  activity compared to the reference. An alternative to standard t-test, namely randomized var‐ iance model (RVM) t-test (Wright and Simon 2003), was found to be more advanta‐ geous for screens with few replicates to detect relatively less strong “hits”  (Malo et al. 2010).
+
+•  SSMD: While t-test is a useful method to calculate the significance of the sample activ‐ ity  by  incorporating  its  variability  across  replicates,  it  lacks  the  ability  to  rank  the samples  by  their  effect  sizes.  As  an  alternative  to  t-test,  SSMD-based  “hit”  selection method for replicates was proposed to enable the calculation of RNAi effects as previ‐ ously  illustrated  in  (Zhang  2011a).  While  SSMD-based  method  is  more  robust  with small sample sizes as opposed to t-test (Zhang 2008a), at least 4 replicates is recom‐ mended in confirmatory screens to identify samples with moderate or higher effects (Zhang and Heyse 2009).
+
+•  Various other p value calculation methods (e.g., redundant siRNA activity, or RSA) (Ko‐ nig et al. 2007) and rank products method (Breitling et al. 2004)) are available, which can be adapted to detect “hits” in RNAi screens (Birmingham et al. 2009).
+
+
+
+6. Conclusion
+
+
+HT screening is a comprehensive process to discover new drug targets using siRNA and drug candidates from small molecule libraries. Statistical evaluation of the assay perform‐ ance is a very critical step in HT screening data analysis. A number of data analysis methods have been developed to correct for plate-to-plate assay variability and systematic errors, and assess assay quality. Statistical analysis is also pivotal in the “hit” selection process from pri‐ mary screens and in the evaluation during confirmatory screens. While some of these meth‐ ods may be intuitively applied using spreadsheet programs (e.g., Microsoft Excel), others may require the development of computer programs using more advanced programming environments (e.g., R, Perl, C++, Java, MATLAB). Besides commercially available compre‐ hensive analysis tools, there are also numerous open-access software packages designed for HT screening data management and analysis for scientist with little or no programming knowledge. A short compilation of freely available analysis tools is listed in Table 3. The growing number of statistical methods will accelerate the discovery of drug candidates with higher confidence.
+Data Analysis Approaches in High Throughput Screening	219 http://dx.doi.org/10.5772/52508
+
+
+Features	Programming Language
+
+
+
+
+Screensaver
+
+
+
+
+
+MScreen
+
+
+
+NEXT-RNAi
+
+
+
+
+K-Screen
+
+
+
+
+
+HTS-Corrector
+
+
+
+
+web cellHTS2
+
+
+
+
+RNAither
+
+
+
+
+
+HTSanalyzeR
+
+Web-based laboratory information management system for management of library and screen information
+(Tolopko et al. 2010)
+
+Web-based compound library and siRNA plate management, QC and dose-response fitting tools (Jacob et al. 2012)
+
+Library design and evaluation tools for RNAi screens (Horn et al. 2010)
+
+Analysis, visualization, management and mining of HT screening data including dose-response curve fitting
+(Tai et al. 2011)
+
+Statistical analysis, visualization and correction of systematic errors for all HT screens
+(Makarenkov et al. 2006)
+
+Web-based analysis toolbox for normalization, QC, “hit” selection and annotation for RNAi screens (Boutros et al. 2006; Pelz et al. 2010)
+
+Automated pipeline for normalization, QC, “hit” selection and pathway generation for RNAi screens (Rieber et al. 2009)
+
+Gene set enrichment, network and gene set comparison analysis for post-processing of RNAi screening data
+(Wang et al. 2011)
+
+
+
+Java
+
+
+
+
+
+PHP, Oracle/MySQL
+
+
+
+Perl
+
+
+
+
+R, PHP, MySQL
+
+
+
+
+
+C#
+
+
+
+
+R/Bioconductor project
+
+
+
+
+R/Bioconductor project
+
+
+
+
+
+R/Bioconductor project
+
+
+
+Table 3. Examples of open-access software packages for library management and statistical analysis of HT screening data.
+
+
+
+Acknowledgements
+
+
+This work was supported by the American Lebanese Syrian Associated Charities (ALSAC), St. Jude Children’s Research Hospital, and National Cancer Institute grant P30CA027165.
+220	Drug Discovery
+
+
+
+Author details
+
+Asli N. Goktug, Sergio C. Chai and Taosheng Chen
+
+High Throughput Screening Center, Department of Chemical Biology and Therapeutics, St. Jude Children’s Research Hospital, USA
+
+
+References
+
+[1]  Ang, K. L., Feroze, F., Ganji, G.,& Li, Y. (2004). Cell-based RNAi assay development for HTS. In: Assay Guidance Manual. Sittampalam, G. S., Gal-Edd, N., Arkin, M., Auld, D., Austin, C., Bejcek, B., Glicksman, M., Inglese, J., Lemmon, V., Li, Z., McGee, J., McManus, O., Minor, L., Napper, A., Riss, T., Trask, J., &Weidner J., pp. 1-20, Eli Lilly & Company, Retrieved from http://www.ncbi.nlm.nih.gov/books/NBK91998/
+
+[2]  Baillargeon, P., Scampavia, L., Einsteder, R., & Hodder, P. (2011). Monitoring of HTS compound library quality via a high-resolution image acquisition and processing in‐ strument. Journal of Laboratory Automation, Vol. 16, No. 3, pp. 197-203.
+
+[3]  Birmingham, A., Selfors, L. M., Forster, T., Wrobel, D., Kennedy, C. J., Shanks, E., Santoyo-Lopez, J., Dunican, D. J., Long, A., Kelleher, D., Smith, Q., Beijersbergen, R. L.,  Ghazal,  P.,  &  Shamu,  C.  E.  (2009).  Statistical  methods  for  analysis  of  high-throughput RNA interference screens. Nature Methods, Vol. 6, No. 8, pp. 569-75.
+
+[4]  Boutros, M., Bras, L. P., & Huber, W. (2006). Analysis of cell-based RNAi screens. Genome Biology, Vol. 7, No. 7, pp. R66.1-11.
+
+[5]  Breitling, R., Armengaud, P., Amtmann, A., & Herzyk, P. (2004). Rank products: a simple, yet powerful, new method to detect differentially regulated genes in replicat‐ ed microarray experiments. FEBS Letters, Vol. 573, No. 1-3, pp. 83-92.
+
+[6]  Brideau, C., Gunter, B., Pikounis, B., & Liaw, A. (2003). Improved statistical methods for hit selection in high-throughput screening. Journal of Biomolecular Screening, Vol. 8, No. 6, pp. 634-47.
+
+[7]  Carralot, J. P., Ogier, A., Boese, A., Genovesio, A., Brodin, P., Sommer, P.,& Dorval, T. (2012). A novel specific edge effect correction method for RNA interference screen‐ ings. Bioinformatics,Vol. 28, No. 2, pp. 261-68.
+
+[8]  Chen, J. J., Roberson, P. K., & Schell, M. J. (2010). The false discovery rate: a key con‐ cept in large-scale genetic studies. Cancer Control, Vol. 17, No. 1, pp. 58-62.
+
+[9]  Cheng, Y., & Prusoff, W. H. (1973). Relationship between the inhibition constant (K1) and the concentration of inhibitor which causes 50 per cent inhibition (I50) of an en‐ zymatic reaction. Biochemical Pharmacology, Vol. 22, No. 23, pp. 3099-108.
+
+[10]  Chung, N., Zhang, X. D., Kreamer, A., Locco, L., Kuan, P., Bartz, S., Linsley, P. S., Ferrer, M., & Strulovici, B. (2008). Median absolute deviation to improve hit selection
+Data Analysis Approaches in High Throughput Screening	221 http://dx.doi.org/10.5772/52508
+
+
+for genome-scale RNAi screens. Journal of Biomolecular Screening, Vol. 13, No. 2, pp. 149-58.
+
+[11]  Coma, I., Herranz, J., & Martin, J. (2009). Statistics and decision making in high-throughput screening. In: High Throughput Screening, Methods in Molecular Biology, Methods and Protocols, Janzen, W. P. & Bernasconi, P., pp. 69-106, Humana Press, ISBN 9781603272575, New York.
+
+[12]  Copeland, R. A. (2003). Mechanistic considerations in high-throughput screening. Analytical Biochemistry, Vol. 320, No. 1, pp. 1-12.
+
+[13]  Copeland, R. A. (2005). Evaluation of Enzyme Inhibitors in Drug Discovery: A Guide for Medicinal Chemists and Pharmacologists, John Wiley & Sons, ISBN 978-0-471-68696-5, Hoboken, New Jersey.
+
+[14]  Echeverri, C. J., Beachy, P. A., Baum, B., Boutros, M., Buchholz, F., Chanda, S. K., Downward, J., Ellenberg, J., Fraser, A. G., Hacohen, N., Hahn, W. C., Jackson, A. L.,Kiger, A., Linsley, P. S., Lum, L., Ma, Y., Mathey-Prevot, B., Root, D. E., Sabatini, D. M., Taipale, J., Perrimon, N.,& Bernards, R. (2006). Minimizing the risk of report‐ ing false positives in large-scale RNAi screens. Nature Methods, Vol. 3, No. 10, pp. 777-79.
+
+[15]  Entzeroth, M., Flotow, H.,& Condron, P.(2009). Overview of high-throughput screen‐ ing. In: Current Protocols in Pharmacology, pp. 9.4.1-27, John Wiley & Sons, Retrieved from http://onlinelibrary.wiley.com/doi/10.1002/0471141755.ph0904s44/abstract
+
+[16]  Gillet, V. J. (2008). New directions in library design and analysis. Current Opinion in Chemical Biology, Vol. 12, No. 3, pp. 372-78.
+
+[17]  Gribbon, P., Lyons, R., Laflin, P., Bradley, J., Chambers, C., Williams, B. S., Keighley, W., & Sewing, A. (2005). Evaluating real-life high-throughput screening data. Journal of Biomolecular Screening, Vol. 10, No. 2, pp. 99-107.
+
+[18]  Gunter, B., Brideau, C., Pikounis, B., &Liaw, A. (2003). Statistical and graphical meth‐ ods for quality control determination of high-throughput screening data. Journal of Biomolecular Screening, Vol. 8, No. 6, pp. 624-33.
+
+[19]  Hampel, F. R. (1971). A General qualitative definition of robustness. The Annals ofMa‐ thematical Statistics, Vol. 42, No. 6, pp. 1887-96.
+
+[20]  Hampel, F. R., Ronchetti, E. M., Rousseeuw, P. J.,& Stahel, W. A. (1986). Robust Statis‐ tics:   The   Approach   Based   on   Influence   Functions.   John   Wiley   &   Sons,   ISBN 9780471829218, New York.
+
+[21]  Harper, G., & Pickett, S. D. (2006). Methods for mining HTS data. Drug Discovery To‐ day, Vol. 11, No. 16-16, pp. 694-99.
+
+[22]  Horn, T., Sandmann, T.,& Boutros, M. (2010). Design and evaluation of genome-wide libraries for RNA interference screens. Genome Biology, Vol. 11, No. 6, pp. R61.1-12.
+222	Drug Discovery
+
+
+
+[23]  Huber, P. J. (1981). Robust Statistics. John Wiley& Sons, ISBN 9780471418054, New York.
+
+[24]  Hund, E., Massart, D. L., & Smeyers-Verbeke, J. (2002). Robust regression and outlier detection in the evaluation of robustness tests with different experimental designs. AnalyticaChimica Acta, Vol. 463, No. 1,pp. 53-73.
+
+[25]  Iglewicz, B., & Hoaglin, D. C. (1993). How to detect and handle outliers.ASQC Quality Press. ISBN 9780873892476, Wisconsin.
+
+[26]  Iversen, P. W., Eastwood, B. J., Sittampalam, G. S., &Cox, K. L. (2006). A comparison of assay performance measures in screening assays: Signal window, Z ‘ factor, andas‐ say variability ratio. Journal of Biomolecular Screening, Vol. 11, No. 3, pp. 247-52.
+
+[27]  Jacob, R. T., Larsen, M. J., Scott, S. D., Kirchhoff, P. D., Sherman, D. H., & Neubig, R. R.(2012). MScreen: An Integrated Compound Management and High-Throughput Screening Data Storage and Analysis System. Journal of Biomolecular Screening, Vol. 20, No. 10, pp. 1-8.
+
+[28]  Kainkaryam, R. M.& Woolf, P. J. (2009). Pooling in high-throughput drug screening. Current Opinion in Drug Discovery &Development, Vo. 12, No. 3, pp. 339-50.
+
+[29]  Kevorkov, D. & Makarenkov, V. (2005). Statistical analysis of systematic errors in high-throughput  screening.  Journal  of  Biomolecular  Screening,  Vol.  10,  No.  6,  pp. 557-67.
+
+[30]  Konig, R., Chiang, C., Tu, B. P., Yan, S. F., DeJesus, P. D., Romero, A., Bergauer, T., Orth, A., Krueger, U., Zhou, Y., & Chanda, S. K. (2007). A probability-based ap‐ proach for the analysis of large-scale RNAi screens. Nature Methods, Vol. 4, No. 10, pp. 847-49.
+
+[31]  Kummel, A., & Parker, C. N. (2011). The Interweaving of Cheminformatics and HTS. In: Cheminformatics and Computational Chemical Biology, Methods in Molecular Biology, Bajorath, J., pp. 435-457, Springer Science+Business Media, ISBN 9781607618393, New York.
+
+[32]  Lundholt, B. K., Scudder, K. M.,& Pagliaro, L. (2003). A simple techniquefor reducing edge effect in cell-based assays. Journal of Biomolecular Screening, Vol. 8, No. 5, pp. 566-70.
+
+[33]  Macarron, R. (2006). Critical review of the role of HTS in drug discovery. Drug Dis‐ covery Today, Vol. 11, No. 7-8, pp. 277-279.
+
+[34]  Macarron, R., &Hertzberg, R. P.(2009). Design and implementation of high through‐ put screening assays. In: High Throughput Screening, Methods in Molecular Biology, Jan‐ zen,  W.  P.  &  Bernasconi,  P.,  pp.  1-32,  Springer  Science+Business  Media,  ISBN 9781603272582, New York.
+Data Analysis Approaches in High Throughput Screening	223 http://dx.doi.org/10.5772/52508
+
+
+[35]  Makarenkov, V., Kevorkov, D., Zentilli, P., Gagarin, A., Malo, N., & Nadon, R. (2006). HTS-Corrector: software for the statistical analysis and correction of experimental high-throughput screening data. Bioinformatics, Vol. 22, No. 11, pp. 1408-09.
+
+[36]  Makarenkov,  V.,  Zentilli,  P.,  Kevorkov,  D.,  Gagarin,  A.,  Malo,  N.,  &Nadon,  R. (2007).An efficient method for the detection and elimination of systematic error in high-throughput screening. Bioinformatics, Vol. 23, No. 13, pp. 1648-57.
+
+[37]  Malo, N., Hanley, J. A., Carlile, G., Liu, J., Pelletier, J., Thomas, D. &Nadon, R. (2010). Experimental design and statistical methods for improved hit detection in high-throughput screening. Journal of Biomolecular Screening, Vol. 15, No. 8, pp. 990-1000.
+
+[38]  Martis, E. A., Radhakrishnan, R., & Badve, R. R. (2011). High-Throughput Screening: The Hits and Leads of Drug Discovery- An Overview. Journal of Applied Pharmaceuti‐ calScience, Vol. 1, No. 1, pp. 2-10.
+
+[39]  McDonald, G. R., Hudson, A. L., Dunn, S. M., You, H., Baker, G. B., Whittal, R. M., Martin, J. W., Jha, A., Edmondson, D. E., & Holt, A. (2008). Bioactive contaminants leach from disposable laboratory plasticware. Science, Vol. 322, No. 5903,pp. 917.
+
+[40]  Mohr, S., Bakal, C., & Perrimon, N. (2010). Genomic screening with RNAi: results and challenges. Annual Review of Biochemistry, Vol. 79, pp. 37-64.
+
+[41]  Mohr, S. E.,& Perrimon, N. (2012). RNAi screening: new approaches, understand‐ ings, and organisms. Wiley Interdisciplinary Reviews. RNA. Vol. 3, No. 2, pp. 145-158.
+
+[42]  Motulsky, H. J.,&Neubig, R. R. (2010). Analyzing binding data. In: Currrent Protocols in Neuroscience, pp. 7.5.1-65, John Wiley and Sons, Retrieved from http://onlineli‐ brary.wiley.com/doi/10.1002/0471142301.ns0705s52/full
+
+[43]  Pelz, O., Gilsdorf, M., & Boutros, M. (2010). web cellHTS2: a web-application for the analysis of high-throughput screening data. BMC Bioinformatics, Vol. 11, pp. 185-90.
+
+[44]  Pereira, D. A.,& Williams, J. A. (2007). Origin and evolution of high throughput screening. British Journal of Pharmacology, Vol. 152, No. 1, pp. 53-61.
+
+[45]  Rieber, N., Knapp, B., Eils, R.,& Kaderali, L. (2009). RNAither, an automated pipeline for the statistical analysis of high-throughput RNAi screens. Bioinformatics, Vol. 25, No. 5, pp. 678-679.
+
+[46]  Root, D. E., Kelley, B. P., & Stockwell, B. R. (2003). Detecting spatial patterns in bio‐ logical array experiments. Journal of Biomolecular Screening, Vol. 8, No. 4, pp. 393-398.
+
+[47]  Rousseeuw, P. J. (1991). Tutorial to Robust Statistics. Journal of Chemometrics, Vol. 5, No. 1, pp. 1-20.
+
+[48]  Singh, A. (1996). Outliers and robust procedures in some chemometric applications. Chemometrics and Intelligent Laboratory Systems, Vol. 33, No. 2, pp. 75-100.
+224	Drug Discovery
+
+
+
+[49]  Stevens, M. E., Bouchard. P. J., Kariv, I., Chung, T. D. Y., &Oldenburg, K. R. (1998). Comparison of automation equipment in high throughput screening. Journal of Bio‐ molecular Screening, Vol. 3, No. 4, pp. 305-11.
+[50]  Stone, D. J., Marine, S., Majercak, J., Ray, W. J., Espeseth, A., Simon, A., & Ferrer, M. (2007). High-throughput screening by RNA interference: control of two distinct types of variance. Cell Cycle, Vol. 6, No. 8, pp. 898-901.
+[51]  Sui, Y., & Wu, Z. (2007). Alternative statistical parameter for high-throughput screen‐ ing assay quality assessment. Journal of Biomolecular Screening, Vol. 12, No. 2, pp. 229-34.
+
+[52]  Tai,  D.,  Chaguturu,  R.,  &  Fang,  J.  (2011).  K-Screen:  a  free  application  for  high throughput screening data analysis, visualization, and laboratory information man‐ agement. Combinatorial Chemistry & High Throughput Screening, Vol. 14, No. 9, pp. 757-65.
+[53]  Tolopko, A. N., Sullivan, J. P., Erickson, S. D., Wrobel, D., Chiang, S. L., Rudnicki, K., Rudnicki, S., Nale, J., Selfors, L. M., Greenhouse, D., Muhlich, J. L., & Shamu, C. E. (2010). Screensaver: an open source lab information management system (LIMS) for high throughput screening facilities. BMC Bioinformatics, Vol. 11, pp. 260-73.
+
+[54]  Tukey, J. W. (1977). Exploratory data analysis. Addison-Wesley Publishing Company, ISBN 9780201076165, Massachusetts.
+[55]  Wang, X., Terfve, C., Rose, J. C., & Markowetz, F. (2011).HTSanalyzeR: an R/Biocon‐ ductor package for integrated network analysis of high-throughput screens. Bioinfor‐ matics, Vol. 27, No. 6, pp. 879-80.
+[56]  Watson, J., Greenough, E. B., Leet, J. E., Ford, M. J., Drexler. D. M., Belcastro, J. V., Herbst, J. J., Chatterjee, M., & Banks, M. (2009). Extraction, identification, and func‐ tional characterization of a bioactive substance from automated compound-handling plastic tips. Journal of Biomolecular Screening, Vol. 14, No. 5, pp. 566-72.
+
+[57]  Waybright, T. J., Britt, J. R., & McCloud, T. G. (2009). Overcoming problems of com‐ pound storage in DMSO: solvent and process alternatives. Journal of Biomolecular Screening, Vol. 14, No. 6, pp. 708-15.
+[58]  Wright, G. W.,& Simon, R. M. (2003). A random variance model for detection of dif‐ ferential gene expression in small microarray experiments. Bioinformatics, Vol. 19, No. 18, pp. 2448-55.
+
+[59]  Wu, Z., Liu, D.,&Sui, Y. (2008). Quantitative assessment of hit detection and confir‐ mation in single and duplicate high-throughput screenings.Journal of Biomolecular Screening, Vol. 13, No. 2, pp. 159-167.
+[60]  Wu, Z., & Wu, Z., (2010). Exploration, visualization, and preprocessing of high-di‐ mensional data. Statistical Methods in Molecular Biology, Vol. 620, pp. 267-84.
+[61]  Xin, H., Bernal, A., Amato, F. A., Pinhasov, A., Kauffman, J., Brenneman, D. E., De‐ rian, C. K., Andrade-Gordon, P., Plata-Salaman, C. R., &Ilyin, S. E. (2004).High-
+Data Analysis Approaches in High Throughput Screening	225 http://dx.doi.org/10.5772/52508
+
+
+throughput   siRNA-based   functional   target   validation.   Journal   of   Biomolecular Screening, Vol. 9, No. 4, pp. 286-93.
+
+[62]  Zhang, J., Chung, T. D. Y., & Oldenburg, K. R. (1999). A simple statistical parameter for use in evaluation and validation of high throughput screening assays. Journal of Biomolecular Screening, Vol. 4, No. 2, pp. 67-73.
+
+[63]  Zhang, X. D. (2007a). A new method with flexible and balanced control of false nega‐ tives  and  false  positives  for  hit  selection  in  RNA  interference  high-throughput screening assays. Journal of Biomolecular Screening, Vol. 12, No. 5, pp. 645-55.
+
+[64]  Zhang, X. D. (2007b). A pair of new statistical parameters for quality control in RNA interference high-throughput screening assays. Genomics, Vol. 89, No. 4, pp. 552-61.
+
+[65]  Zhang, X. D. (2008a). Genome-wide screens for effective siRNAs through assessing the size of siRNA effects. BMC Research Notes, Vol. 1, pp. 33-39.
+
+[66]  Zhang, X. D. (2008b). Novel analytic criteria and effective plate designs for quality control in genome-scale RNAi screens. Journal of Biomolecular Screening, Vol. 13, No. 5, pp. 363-77.
+
+[67]  Zhang, X. D. (2009). A method for effectively comparing gene effects in multiple con‐ ditions in RNAi and expression-profiling research. Pharmacogenomics, Vol. 10, No. 3, pp. 345-58.
+
+[68]  Zhang, X. D. (2010a). Assessing the size of gene or RNAi effects in multifactor high-throughput experiments. Pharmacogenomics, Vol. 11, No. 2, pp. 199-213.
+
+[69]  Zhang, X. D. (2010b). An effective method for controlling false discovery and false nondiscovery rates in genome-scale RNAi screens. Journal of Biomolecular Screening, Vol. 15, No. 9, pp. 1116-22.
+
+[70]  Zhang, X. D. (2011a). Illustration of SSMD, z score, SSMD*, z* score, and t statistic for hit selection in RNAi high-throughput screens. Journal of Biomolecular Screening, Vol. 16, No. 7, pp. 775-85.
+
+[71]  Zhang, X. D. (2011b). Optimal high-throughput screening: practical experimental design and data analysis for genome-scale RNAi research. Cambridge University Press, ISBN 9780521734448, New York.
+
+[72]  Zhang, X. D., Espeseth, Johnson. E. N., Chin, J., Gates, A., Mitnaul, L. J., Marine, S. D., Tian, J., Stec, E. M., Kunapuli, P., Holder, D. J., Heyse, J. F., Strulovici, B.,& Ferrer, M. (2008a). Integrating experimental and analytic approaches to improve data quali‐ ty in genome-wide RNAi screens. Journal of Biomolecular Screening, Vol.13, No. 5, pp. 378-89.
+
+[73]  Zhang, X. D.,& Heyse, J. F. (2009). Determination of sample size in genome-scale RNAi screens. Bioinformatics, Vol. 25, No. 7, pp. 841-44.
+
+[74]  Zhang, X. D., Kuan, P. F., Ferrer, M., Shu, X., Liu, Y. C., Gates, A. T., Kunapuli, P., Stec, E. M., Xu, M., Marine, S. D., Holder, D. J., Strulovici, B., Heyse, J. F., & Espeseth,
+226	Drug Discovery
+
+
+
+A. S. (2008b). Hit selection with false discovery rate control in genome-scale RNAi screens. Nucleic Acids Research, Vol. 36, No. 14, pp. 4667-79.
+
+[75]  Zhang, X. D., Lacson, R., Yang, R., Marine, S. D., McCampbell, A., Toolan, D. M., Hare, T. R., Kajdas, J., Berger, J. P., Holder, D. J., Heyse, J. F., & Ferrer, M.(2010). The use of SSMD-based false discovery and false nondiscovery rates in genome-scale RNAi screens. Journal of Biomolecular Screening, Vol. 15, No. 9, pp. 1123-231.
+
+[76]  Zhang, X. D., Yang, X. C., Chung, N., Gates, A., Stec, E., Kunapuli, P., Holder, D. J., Ferrer, M., & Espeseth, A. S. (2006). Robust statistical methods for hit selection in RNA interference high-throughput screening experiments. Pharmacogenomics, Vol. 7, No. 3, pp. 299-309.
+
+[77]  Zhao, L., Li, T., Pan, Y., Ning, H., Liu, Z.,& Fan, D. (2005). Application of siRNA li‐ brary in high-throughput genetic screens of mammalian cells. Journal of Cancer Mole‐ cules, Vol. 1, No. 1, pp. 19-25.
