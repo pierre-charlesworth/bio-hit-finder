@@ -841,9 +841,14 @@ def main() -> None:
         # Sample data load option
         st.write("**Or load sample data:**")
         if st.button("🎯 Load Sample Data", help="Load sample plate data directly to test the platform"):
-            # Load sample CSV data into the uploader
-            with open('sample_plate_data.csv', 'rb') as f:
-                sample_data = f.read()
+            # Generate sample data on-the-fly
+            from sample_data_generator import create_demo_data
+            import io
+            
+            demo_df = create_demo_data()
+            csv_buffer = io.StringIO()
+            demo_df.to_csv(csv_buffer, index=False)
+            sample_data = csv_buffer.getvalue().encode('utf-8')
             
             # Store in session state to simulate file upload
             st.session_state.sample_loaded = True
