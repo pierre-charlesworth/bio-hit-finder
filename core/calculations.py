@@ -525,9 +525,9 @@ def apply_reporter_hit_gate(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     ldtD_hit = (df['Z_ldtD'] >= z_threshold_ldtD) & df['viability_ok_ldtD']
     
     # OR logic: either reporter can trigger a hit
-    result_df['LumHit'] = lptA_hit | ldtD_hit
+    result_df['reporter_hit'] = lptA_hit | ldtD_hit
     
-    hit_count = result_df['LumHit'].sum()
+    hit_count = result_df['reporter_hit'].sum()
     logger.info(f"Stage 1 Reporter hits: {hit_count} / {len(result_df)} wells "
                f"(Z≥{z_threshold_lptA:.1f} lptA or Z≥{z_threshold_ldtD:.1f} ldtD + viable)")
     
@@ -576,9 +576,9 @@ def apply_vitality_hit_gate(df: pd.DataFrame, config: dict) -> pd.DataFrame:
     SA_survives = (df['SA%'] > SA_min) & ~df['SA%'].isna()
     
     # AND logic: all three conditions must be met
-    result_df['OMpatternOK'] = tolC_inhibited & WT_survives & SA_survives
+    result_df['vitality_hit'] = tolC_inhibited & WT_survives & SA_survives
     
-    hit_count = result_df['OMpatternOK'].sum()
+    hit_count = result_df['vitality_hit'].sum()
     logger.info(f"Stage 2 Vitality hits: {hit_count} / {len(result_df)} wells "
                f"(tolC%≤{tolC_max}, WT%>{WT_min}, SA%>{SA_min})")
     
@@ -601,20 +601,20 @@ def apply_platform_hit_gate(df: pd.DataFrame) -> pd.DataFrame:
     result_df = df.copy()
     
     # Check required columns
-    required_cols = ['LumHit', 'OMpatternOK']
+    required_cols = ['reporter_hit', 'vitality_hit']
     missing_cols = [col for col in required_cols if col not in df.columns]
     
     if missing_cols:
         logger.error(f"Missing columns for platform hit calling: {missing_cols}")
-        result_df['PlatformHit'] = False
+        result_df['platform_hit'] = False
         return result_df
     
     # AND logic: must pass both reporter and vitality
-    result_df['PlatformHit'] = df['LumHit'] & df['OMpatternOK']
+    result_df['platform_hit'] = df['reporter_hit'] & df['vitality_hit']
     
-    hit_count = result_df['PlatformHit'].sum()
-    reporter_hits = df['LumHit'].sum()
-    vitality_hits = df['OMpatternOK'].sum()
+    hit_count = result_df['platform_hit'].sum()
+    reporter_hits = df['reporter_hit'].sum()
+    vitality_hits = df['vitality_hit'].sum()
     
     logger.info(f"Stage 3 Platform hits: {hit_count} / {len(result_df)} wells "
                f"(Reporter: {reporter_hits}, Vitality: {vitality_hits}, Both: {hit_count})")
@@ -655,9 +655,9 @@ def process_multi_stage_hit_calling(df: pd.DataFrame, config: dict) -> pd.DataFr
         
         # Log final summary
         total_wells = len(result_df)
-        reporter_hits = result_df['LumHit'].sum()
-        vitality_hits = result_df['OMpatternOK'].sum()
-        platform_hits = result_df['PlatformHit'].sum()
+        reporter_hits = result_df['reporter_hit'].sum()
+        vitality_hits = result_df['vitality_hit'].sum()
+        platform_hits = result_df['platform_hit'].sum()
         
         logger.info(f"Multi-stage hit calling complete: {total_wells} wells total, "
                    f"{reporter_hits} reporter hits, {vitality_hits} vitality hits, "

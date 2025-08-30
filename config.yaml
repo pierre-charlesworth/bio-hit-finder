@@ -15,7 +15,7 @@ processing:
 # Multi-stage hit calling parameters for dual-readout compound screening
 hit_calling:
   # Enable multi-stage hit calling (reporter -> vitality -> platform)
-  multi_stage_enabled: false
+  multi_stage_enabled: true
   
   # Stage 1: Reporter hit detection
   reporter:
