@@ -169,6 +169,9 @@ data/processed/
 *.xlsx
 *.xls
 
+# Allow sample data file to be tracked
+!sample_plate_data.csv
+
 # Export artifacts
 exports/
 output/

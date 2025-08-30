@@ -841,19 +841,17 @@ def main() -> None:
         # Sample data load option
         st.write("**Or load sample data:**")
         if st.button("🎯 Load Sample Data", help="Load sample plate data directly to test the platform"):
-            # Generate sample data on-the-fly
-            from sample_data_generator import create_demo_data
-            import io
-            
-            demo_df = create_demo_data()
-            csv_buffer = io.StringIO()
-            demo_df.to_csv(csv_buffer, index=False)
-            sample_data = csv_buffer.getvalue().encode('utf-8')
-            
-            # Store in session state to simulate file upload
-            st.session_state.sample_loaded = True
-            st.session_state.sample_data = {'sample_plate_data.csv': sample_data}
-            st.rerun()
+            # Load pre-generated sample CSV file
+            try:
+                with open('sample_plate_data.csv', 'rb') as f:
+                    sample_data = f.read()
+                
+                # Store in session state to simulate file upload
+                st.session_state.sample_loaded = True
+                st.session_state.sample_data = {'sample_plate_data.csv': sample_data}
+                st.rerun()
+            except FileNotFoundError:
+                st.error("Sample data file not found. Please generate it first by running: python sample_data_generator.py")
         
         # Use sample data if loaded, otherwise use uploaded files
         files_to_process = uploaded_files
