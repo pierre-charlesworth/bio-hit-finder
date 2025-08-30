@@ -28,7 +28,7 @@ from analytics.hit_calling import HitCallingAnalyzer, analyze_multi_plate_hits, 
 from sample_data_generator import create_demo_data
 
 # Import advanced visualization modules
-# from visualizations.advanced.qc_dashboard import QCDashboard  # Temporarily commented for debugging
+from visualizations.advanced.qc_dashboard import QCDashboard
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -1775,14 +1775,13 @@ def main() -> None:
             # Load configuration
             config = load_config()
             
-            # QC Dashboard (new advanced visualization) - Temporarily disabled for debugging
-            if False:  # config.get('visualization_features', {}).get('qc_dashboard', {}).get('enabled', True):
+            # QC Dashboard (advanced visualization)
+            if config.get('visualization_features', {}).get('qc_dashboard', {}).get('enabled', True):
                 st.subheader("🔬 Quality Control Dashboard")
                 
                 try:
-                    st.info("QC Dashboard temporarily disabled for debugging")
-                    # qc_dashboard = QCDashboard(config)
-                    # qc_dashboard.render_dashboard(df)
+                    qc_dashboard = QCDashboard(config)
+                    qc_dashboard.render_dashboard(df)
                 except Exception as e:
                     st.error(f"Error rendering QC Dashboard: {str(e)}")
                     logger.error(f"QC Dashboard error: {e}", exc_info=True)
