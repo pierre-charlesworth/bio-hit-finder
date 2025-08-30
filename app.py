@@ -838,66 +838,42 @@ def main() -> None:
             *Funded by the European Union*
             """)
         
-        # Demo data option
-        st.write("**Or try with demo data:**")
-        use_demo_data = st.button("🎯 Load Demo Data", help="Load sample plate data to explore the platform")
+        # Sample data load option
+        st.write("**Or load sample data:**")
+        if st.button("🎯 Load Sample Data", help="Load sample plate data directly to test the platform"):
+            # Load sample CSV data into the uploader
+            with open('sample_plate_data.csv', 'rb') as f:
+                sample_data = f.read()
+            
+            # Store in session state to simulate file upload
+            st.session_state.sample_loaded = True
+            st.session_state.sample_data = {'sample_plate_data.csv': sample_data}
+            st.rerun()
+        
+        # Use sample data if loaded, otherwise use uploaded files
+        files_to_process = uploaded_files
+        if hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
+            files_to_process = st.session_state.sample_data
+            st.info("Sample data loaded! Click 'Process Data' to analyze.")
         
         # Process data button
-        process_data = st.button("Process Data", type="primary", disabled=not (uploaded_files or use_demo_data))
+        process_data = st.button("Process Data", type="primary", disabled=not files_to_process)
         
-        # Process files or demo data when button is clicked
+        # Process files when button is clicked
         if process_data:
             with st.spinner("Processing plate data..."):
                 processed_df = None
                 
-                if use_demo_data:
-                    # Load and process demo data
-                    try:
-                        demo_df = create_demo_data()
-                        processor = PlateProcessor(viability_threshold)
-                        
-                        # Process each plate in demo data
-                        processed_plates = []
-                        for plate_id in demo_df['PlateID'].unique():
-                            plate_df = demo_df[demo_df['PlateID'] == plate_id].copy()
-                            
-                            # Choose processing method based on hit calling mode
-                            # Always use dual-readout processing for compound screening
-                            processed_plate = processor.process_dual_readout_plate(plate_df, plate_id, hit_calling_config)
-                            
-                            processed_plates.append(processed_plate)
-                        
-                        processed_df = pd.concat(processed_plates, ignore_index=True)
-                        
-                        # Apply B-scoring if requested
-                        if apply_b_scoring and len(processed_df) > 0:
-                            bscore_processor = BScoreProcessor()
-                            processed_plates_bscore = []
-                            
-                            for plate_id in processed_df['PlateID'].unique():
-                                plate_df = processed_df[processed_df['PlateID'] == plate_id].copy()
-                                
-                                # Apply B-scoring to Z-scores
-                                for metric in ['Z_lptA', 'Z_ldtD']:
-                                    if metric in plate_df.columns:
-                                        b_scores = bscore_processor.calculate_b_scores(plate_df, metric)
-                                        plate_df[f'B_{metric}'] = b_scores
-                                
-                                processed_plates_bscore.append(plate_df)
-                            
-                            processed_df = pd.concat(processed_plates_bscore, ignore_index=True)
-                        
-                        st.success("Demo data loaded and processed successfully!")
-                        
-                    except Exception as e:
-                        st.error(f"Failed to load demo data: {e}")
-                        logger.error(f"Demo data error: {e}")
-                        
-                elif uploaded_files:
-                    # Convert uploaded files to bytes for caching
+                if files_to_process:
+                    # Convert files to bytes for caching
                     files_data = {}
-                    for file in uploaded_files:
-                        files_data[file.name] = file.getvalue()
+                    if hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
+                        # Use sample data
+                        files_data = files_to_process
+                    else:
+                        # Use uploaded files
+                        for file in files_to_process:
+                            files_data[file.name] = file.getvalue()
                     
                     # Choose processing method based on multi-sheet mode
                     if st.session_state.multi_sheet_mode:
