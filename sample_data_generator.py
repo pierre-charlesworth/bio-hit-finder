@@ -61,7 +61,7 @@ def generate_sample_plate(
         for j in range(1, n_cols + 1):
             rows.append(row_label)
             cols.append(j)
-            wells.append(f"{row_label}{j:02d}")
+            wells.append(f"{row_label}{j}")
     
     n_wells = len(wells)
     
@@ -187,7 +187,8 @@ def generate_sample_plate(
         'PlateID': [plate_id] * n_wells,
         'Well': wells,
         'Row': rows,
-        'Col': cols,
+        'Column': cols,  # Use 'Column' instead of 'Col' to match config
+        'ATP': np.round(np.maximum(base_bt_lptA, 50), 1),  # Add ATP column (same as BT_lptA)
         **{k: np.round(v, 1) for k, v in measurements.items()}
     })
     
