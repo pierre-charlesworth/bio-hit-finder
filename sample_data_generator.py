@@ -188,7 +188,6 @@ def generate_sample_plate(
         'Well': wells,
         'Row': rows,
         'Column': cols,  # Use 'Column' instead of 'Col' to match config
-        'ATP': np.round(np.maximum(base_bt_lptA, 50), 1),  # Add ATP column (same as BT_lptA)
         **{k: np.round(v, 1) for k, v in measurements.items()}
     })
     
