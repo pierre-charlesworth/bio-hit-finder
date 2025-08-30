@@ -27,6 +27,9 @@ from analytics.bscore import BScoreProcessor
 from analytics.hit_calling import HitCallingAnalyzer, analyze_multi_plate_hits, format_hit_calling_report
 from sample_data_generator import create_demo_data
 
+# Import advanced visualization modules
+from visualizations.advanced.qc_dashboard import QCDashboard
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -1787,6 +1790,23 @@ def main() -> None:
         st.header("QC Report")
         
         if df is not None and len(df) > 0:
+            # Load configuration
+            config = load_config()
+            
+            # QC Dashboard (new advanced visualization)
+            if config.get('visualization_features', {}).get('qc_dashboard', {}).get('enabled', True):
+                st.subheader("🔬 Quality Control Dashboard")
+                
+                try:
+                    qc_dashboard = QCDashboard(config)
+                    qc_dashboard.render_dashboard(df)
+                except Exception as e:
+                    st.error(f"Error rendering QC Dashboard: {str(e)}")
+                    logger.error(f"QC Dashboard error: {e}", exc_info=True)
+                
+                st.divider()
+            
+            st.subheader("📋 Quality Control Report Generation")
             st.write("**Quality Control Report Generation**")
             
             # Quick reference formulas

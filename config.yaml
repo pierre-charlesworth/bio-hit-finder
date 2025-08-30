@@ -107,6 +107,32 @@ visualization:
     # Image format for exports
     format: "png"
 
+# Advanced visualization features (new)
+visualization_features:
+  qc_dashboard:
+    enabled: true
+    alert_thresholds:
+      z_factor_min: 0.5
+      sb_ratio_min: 3.0
+      cv_percent_max: 20.0
+  
+  cross_reporter_correlation:
+    enabled: false  # Will enable in next feature
+    brushing_enabled: true
+    quadrant_analysis: true
+
+# Visualization performance parameters
+visualization_params:
+  performance:
+    max_points_scatter: 10000
+    decimation_threshold: 50000
+    cache_duration: 3600
+  
+  layout:
+    dashboard_columns: 3
+    responsive_breakpoint: 768
+    color_scheme: "scientific"
+
 # Export settings
 export:
   # Default formats to include in ZIP bundle
