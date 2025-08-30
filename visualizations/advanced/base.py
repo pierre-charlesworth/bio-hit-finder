@@ -111,10 +111,10 @@ class QCMetricsCalculator:
             elif z_factor < z_min:
                 alerts.append({'message': f'Marginal Z-factor: {z_factor:.2f}', 'severity': 'medium'})
         
-        # S:B ratio alerts
-        sb_min = config.get('visualization_features', {}).get('qc_dashboard', {}).get('alert_thresholds', {}).get('sb_ratio_min', 3.0)
+        # S:B ratio alerts (adapted for P90/median approach)
+        sb_min = config.get('visualization_features', {}).get('qc_dashboard', {}).get('alert_thresholds', {}).get('sb_ratio_min', 1.5)
         if not np.isnan(sb_ratio) and sb_ratio < sb_min:
-            alerts.append({'message': f'Low S:B ratio: {sb_ratio:.2f}', 'severity': 'medium'})
+            alerts.append({'message': f'Low dynamic range (P90/median): {sb_ratio:.2f}', 'severity': 'medium'})
         
         # CV% alerts
         cv_max = config.get('visualization_features', {}).get('qc_dashboard', {}).get('alert_thresholds', {}).get('cv_percent_max', 20.0)

@@ -81,15 +81,22 @@ class QCDashboard(BaseVisualization):
         pos_controls = data[data['Well'].isin(control_wells['positive'])][ratio_col].dropna()
         neg_controls = data[data['Well'].isin(control_wells['negative'])][ratio_col].dropna()
         
-        # Calculate Z-factor
-        metrics['z_factor'] = self.calculator.calculate_z_factor(pos_controls, neg_controls)
+        # Z-factor calculation disabled for screening plates (requires defined controls)
+        metrics['z_factor'] = np.nan  # Will be implemented as future feature
         
-        # Calculate S:B ratio
-        metrics['sb_ratio'] = self.calculator.calculate_signal_to_background(pos_controls, neg_controls)
+        # Calculate S:B ratio using screening-appropriate approach
+        # Signal = 90th percentile, Background = median
+        all_ratios = data[ratio_col].dropna()
+        if len(all_ratios) > 0:
+            signal = all_ratios.quantile(0.9)  # 90th percentile as signal
+            background = all_ratios.median()   # Median as background
+            metrics['sb_ratio'] = signal / background if background > 0 else np.nan
+        else:
+            metrics['sb_ratio'] = np.nan
         
-        # Calculate CV% for controls
-        metrics['pos_cv'] = self.calculator.calculate_cv_percent(pos_controls)
-        metrics['neg_cv'] = self.calculator.calculate_cv_percent(neg_controls)
+        # CV% calculation disabled for screening plates (requires defined controls)
+        metrics['pos_cv'] = np.nan  # Will be implemented as future feature
+        metrics['neg_cv'] = np.nan  # Will be implemented as future feature
         
         # Calculate overall metrics
         all_ratios = data[ratio_col].dropna()
@@ -159,7 +166,7 @@ class QCDashboard(BaseVisualization):
         fig = make_subplots(
             rows=2, cols=3,
             subplot_titles=[
-                'Z-Factor Performance', 'Signal-to-Background Ratios', 'Control CV%',
+                'Z-Factor (Disabled)', 'Signal-to-Background (P90/Median)', 'Control CV% (Disabled)',
                 'Hit Rates', 'Quality Alerts', 'Plate Summary'
             ],
             specs=[
@@ -168,28 +175,27 @@ class QCDashboard(BaseVisualization):
             ]
         )
         
-        # Z-Factor plot
+        # Z-Factor plot disabled for screening plates (future feature)
         if 'lptA' in metrics and 'ldtD' in metrics:
             reporters = ['lptA', 'ldtD']
-            z_factors = [metrics[r].get('z_factor', 0) for r in reporters]
             
             fig.add_trace(
                 go.Bar(
                     x=reporters,
-                    y=z_factors,
-                    name='Z-Factor',
-                    marker_color=['green' if z > 0.5 else 'orange' if z > 0 else 'red' for z in z_factors],
-                    text=[f'{z:.3f}' for z in z_factors],
+                    y=[0] * len(reporters),  # Placeholder values
+                    name='Z-Factor (Disabled)',
+                    marker_color='lightgray',
+                    text=['N/A (Future Feature)'] * len(reporters),
                     textposition='auto'
                 ),
                 row=1, col=1
             )
             
-            # Add Z-factor reference lines
-            fig.add_hline(y=0.5, line_dash="dash", line_color="green", 
-                         annotation_text="Excellent (≥0.5)", row=1, col=1)
-            fig.add_hline(y=0.0, line_dash="dash", line_color="orange", 
-                         annotation_text="Marginal (0-0.5)", row=1, col=1)
+            # Reference lines disabled for Z-factor (future feature)
+            # fig.add_hline(y=0.5, line_dash="dash", line_color="green", 
+            #              annotation_text="Excellent (≥0.5)", row=1, col=1)
+            # fig.add_hline(y=0.0, line_dash="dash", line_color="orange", 
+            #              annotation_text="Marginal (0-0.5)", row=1, col=1)
         
         # S:B Ratio plot
         if 'lptA' in metrics and 'ldtD' in metrics:
@@ -199,38 +205,23 @@ class QCDashboard(BaseVisualization):
                 go.Bar(
                     x=reporters,
                     y=sb_ratios,
-                    name='S:B Ratio',
-                    marker_color=['green' if sb > 3 else 'orange' for sb in sb_ratios],
+                    name='S:B Ratio (P90/Median)',
+                    marker_color=['green' if sb >= 2 else 'orange' if sb >= 1.5 else 'red' for sb in sb_ratios],
                     text=[f'{sb:.2f}' for sb in sb_ratios],
                     textposition='auto'
                 ),
                 row=1, col=2
             )
         
-        # Control CV% plot
+        # Control CV% plot disabled for screening plates (future feature)
         if 'lptA' in metrics and 'ldtD' in metrics:
-            pos_cvs = [metrics[r].get('pos_cv', 0) for r in reporters]
-            neg_cvs = [metrics[r].get('neg_cv', 0) for r in reporters]
-            
             fig.add_trace(
                 go.Bar(
                     x=reporters,
-                    y=pos_cvs,
-                    name='Positive CV%',
-                    marker_color='lightblue',
-                    text=[f'{cv:.1f}%' for cv in pos_cvs],
-                    textposition='auto'
-                ),
-                row=1, col=3
-            )
-            
-            fig.add_trace(
-                go.Bar(
-                    x=reporters,
-                    y=neg_cvs,
-                    name='Negative CV%',
-                    marker_color='lightcoral',
-                    text=[f'{cv:.1f}%' for cv in neg_cvs],
+                    y=[0] * len(reporters),  # Placeholder values
+                    name='Control CV% (Disabled)',
+                    marker_color='lightgray',
+                    text=['N/A (Future Feature)'] * len(reporters),
                     textposition='auto'
                 ),
                 row=1, col=3
@@ -314,27 +305,30 @@ class QCDashboard(BaseVisualization):
         """Calculate overall quality score (0-100)."""
         scores = []
         
-        # Z-factor scores
-        for reporter in ['lptA', 'ldtD']:
-            if reporter in metrics:
-                z_factor = metrics[reporter].get('z_factor', 0)
-                if z_factor >= 0.5:
-                    scores.append(100)
-                elif z_factor >= 0:
-                    scores.append(60)
-                else:
-                    scores.append(20)
+        # Z-factor scores disabled for screening plates
+        # (Future feature: will be enabled when control wells are defined)
+        # for reporter in ['lptA', 'ldtD']:
+        #     if reporter in metrics:
+        #         z_factor = metrics[reporter].get('z_factor', 0)
+        #         if z_factor >= 0.5:
+        #             scores.append(100)
+        #         elif z_factor >= 0:
+        #             scores.append(60)
+        #         else:
+        #             scores.append(20)
         
-        # S:B ratio scores
+        # S:B ratio scores (adapted thresholds for P90/median approach)
         for reporter in ['lptA', 'ldtD']:
             if reporter in metrics:
                 sb_ratio = metrics[reporter].get('sb_ratio', 0)
-                if sb_ratio >= 3:
+                if sb_ratio >= 2.0:  # Excellent dynamic range
                     scores.append(100)
-                elif sb_ratio >= 2:
-                    scores.append(70)
-                else:
-                    scores.append(40)
+                elif sb_ratio >= 1.5:  # Good dynamic range
+                    scores.append(80)
+                elif sb_ratio >= 1.2:  # Marginal dynamic range
+                    scores.append(60)
+                else:  # Poor dynamic range
+                    scores.append(20)
         
         # Alert penalty
         alerts = metrics.get('alerts', [])
@@ -365,17 +359,17 @@ class QCDashboard(BaseVisualization):
                 st.write("**lptA Reporter**")
                 if 'lptA' in metrics:
                     lpta_metrics = metrics['lptA']
-                    st.metric("Z-Factor", f"{lpta_metrics.get('z_factor', 0):.3f}")
+                    st.metric("Z-Factor", "N/A", help="Z-factor disabled for screening plates")
                     st.metric("S:B Ratio", f"{lpta_metrics.get('sb_ratio', 0):.2f}")
-                    st.metric("Pos Ctrl CV%", f"{lpta_metrics.get('pos_cv', 0):.1f}%")
+                    st.metric("Pos Ctrl CV%", "N/A", help="CV% disabled for screening plates")
             
             with col2:
                 st.write("**ldtD Reporter**")
                 if 'ldtD' in metrics:
                     ldtd_metrics = metrics['ldtD']
-                    st.metric("Z-Factor", f"{ldtd_metrics.get('z_factor', 0):.3f}")
+                    st.metric("Z-Factor", "N/A", help="Z-factor disabled for screening plates")
                     st.metric("S:B Ratio", f"{ldtd_metrics.get('sb_ratio', 0):.2f}")
-                    st.metric("Pos Ctrl CV%", f"{ldtd_metrics.get('pos_cv', 0):.1f}%")
+                    st.metric("Pos Ctrl CV%", "N/A", help="CV% disabled for screening plates")
             
             with col3:
                 st.write("**Overall Plate**")

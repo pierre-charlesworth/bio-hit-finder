@@ -113,7 +113,7 @@ visualization_features:
     enabled: true
     alert_thresholds:
       z_factor_min: 0.5
-      sb_ratio_min: 3.0
+      sb_ratio_min: 1.5  # Adapted for P90/median approach
       cv_percent_max: 20.0
   
   cross_reporter_correlation:
