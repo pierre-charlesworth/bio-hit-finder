@@ -1096,7 +1096,7 @@ def main() -> None:
             if edge_results:
                 # Get the most severe warning level
                 warning_levels = [result.warning_level for result in edge_results if hasattr(result, 'warning_level')]
-                max_warning = max(warning_levels) if warning_levels else WarningLevel.NONE
+                max_warning = max(warning_levels) if warning_levels else WarningLevel.INFO
                 st.markdown(render_edge_effect_badge(max_warning), unsafe_allow_html=True)
                 
                 # Expandable diagnostics
