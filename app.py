@@ -1735,9 +1735,9 @@ def main() -> None:
             with viz_col4:
                 # Viability counts by plate
                 st.subheader("Viability by Plate")
-                if 'viable_lptA' in df.columns and 'PlateID' in df.columns:
+                if 'viability_ok_lptA' in df.columns and 'PlateID' in df.columns:
                     # Create a proper DataFrame for the bar chart
-                    viability_summary = df.groupby('PlateID')['viable_lptA'].value_counts().unstack(fill_value=0)
+                    viability_summary = df.groupby('PlateID')['viability_ok_lptA'].value_counts().unstack(fill_value=0)
                     
                     # Create the DataFrame in the right format for plotly
                     plot_data = []
