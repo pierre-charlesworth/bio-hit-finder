@@ -767,84 +767,84 @@ def main() -> None:
             )
             
             # Hit calling configuration panel
-            with st.expander("🎯 Hit Calling Thresholds", expanded=True):
-                st.write("**Reporter Hit Detection (Stage 1)**")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    z_threshold_lptA = st.number_input(
-                        "lptA Z-score threshold",
-                        min_value=1.0,
-                        max_value=5.0,
-                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
-                        step=0.1,
-                        help="Minimum Z-score for lptA reporter hits. LptA (periplasmic bridge protein) is upregulated by σE during LPS transport stress and OM destabilization."
-                    )
-            
-            with col2:
-                z_threshold_ldtD = st.number_input(
-                    "ldtD Z-score threshold",
+        st.subheader("🎯 Hit Calling Thresholds")
+        st.write("**Reporter Hit Detection (Stage 1)**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            z_threshold_lptA = st.number_input(
+                    "lptA Z-score threshold",
                     min_value=1.0,
                     max_value=5.0,
-                    value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_ldtD', 2.0),
+                    value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
                     step=0.1,
-                    help="Minimum Z-score for ldtD reporter hits. LdtD (L,D-transpeptidase) is Cpx-regulated and forms 3-3 crosslinks to compensate for OM structural weakness."
+                    help="Minimum Z-score for lptA reporter hits. LptA (periplasmic bridge protein) is upregulated by σE during LPS transport stress and OM destabilization."
                 )
-            
-            st.write("**Vitality Hit Detection (Stage 2)**")
-            col3, col4, col5 = st.columns(3)
-            
-            with col3:
-                tolc_max_threshold = st.slider(
-                        "tolC max %",
-                        min_value=0.1,
-                        max_value=1.0,
-                        value=config.get('hit_calling', {}).get('vitality', {}).get('tolC_max_threshold', 0.8),
-                        step=0.05,
-                        help="E. coli ΔtolC max growth percentage (≤80%). ΔtolC has impaired OM and increased permeability, making it sensitive to OM-disrupting compounds."
-                )
-            
-            with col4:
-                wt_min_threshold = st.slider(
-                    "WT min %",
+        
+        with col2:
+            z_threshold_ldtD = st.number_input(
+                "ldtD Z-score threshold",
+                min_value=1.0,
+                max_value=5.0,
+                value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_ldtD', 2.0),
+                step=0.1,
+                help="Minimum Z-score for ldtD reporter hits. LdtD (L,D-transpeptidase) is Cpx-regulated and forms 3-3 crosslinks to compensate for OM structural weakness."
+            )
+        
+        st.write("**Vitality Hit Detection (Stage 2)**")
+        col3, col4, col5 = st.columns(3)
+        
+        with col3:
+            tolc_max_threshold = st.slider(
+                    "tolC max %",
                     min_value=0.1,
                     max_value=1.0,
-                    value=config.get('hit_calling', {}).get('vitality', {}).get('wt_min_threshold', 0.8),
+                    value=config.get('hit_calling', {}).get('vitality', {}).get('tolC_max_threshold', 0.8),
                     step=0.05,
-                    help="E. coli WT min growth percentage (>80%). WT has intact OM providing natural resistance to OM-disrupting compounds."
-                )
-            
-            with col5:
-                sa_min_threshold = st.slider(
-                    "SA min %",
-                    min_value=0.1,
-                    max_value=1.0,
-                    value=config.get('hit_calling', {}).get('vitality', {}).get('sa_min_threshold', 0.8),
-                    step=0.05,
-                    help="S. aureus min growth percentage (>80%). Gram-positive control with no OM - should be unaffected by OM-disrupting compounds."
-                )
-            
-            # Build hit calling configuration
-            hit_calling_config = {
-                'hit_calling': {
-                    'multi_stage_enabled': True,
-                    'reporter': {
-                        'z_threshold_lptA': z_threshold_lptA,
-                        'z_threshold_ldtD': z_threshold_ldtD,
-                        'require_viability': True,
-                        'combine_mode': 'OR'
-                    },
-                    'vitality': {
-                        'tolC_max_threshold': tolc_max_threshold,
-                        'wt_min_threshold': wt_min_threshold,
-                        'sa_min_threshold': sa_min_threshold,
-                        'require_all_conditions': True
-                    },
-                    'platform': {
-                        'require_both_stages': True
-                    }
+                    help="E. coli ΔtolC max growth percentage (≤80%). ΔtolC has impaired OM and increased permeability, making it sensitive to OM-disrupting compounds."
+            )
+        
+        with col4:
+            wt_min_threshold = st.slider(
+                "WT min %",
+                min_value=0.1,
+                max_value=1.0,
+                value=config.get('hit_calling', {}).get('vitality', {}).get('wt_min_threshold', 0.8),
+                step=0.05,
+                help="E. coli WT min growth percentage (>80%). WT has intact OM providing natural resistance to OM-disrupting compounds."
+            )
+        
+        with col5:
+            sa_min_threshold = st.slider(
+                "SA min %",
+                min_value=0.1,
+                max_value=1.0,
+                value=config.get('hit_calling', {}).get('vitality', {}).get('sa_min_threshold', 0.8),
+                step=0.05,
+                help="S. aureus min growth percentage (>80%). Gram-positive control with no OM - should be unaffected by OM-disrupting compounds."
+            )
+        
+        # Build hit calling configuration
+        hit_calling_config = {
+            'hit_calling': {
+                'multi_stage_enabled': True,
+                'reporter': {
+                    'z_threshold_lptA': z_threshold_lptA,
+                    'z_threshold_ldtD': z_threshold_ldtD,
+                    'require_viability': True,
+                    'combine_mode': 'OR'
+                },
+                'vitality': {
+                    'tolC_max_threshold': tolc_max_threshold,
+                    'wt_min_threshold': wt_min_threshold,
+                    'sa_min_threshold': sa_min_threshold,
+                    'require_all_conditions': True
+                },
+                'platform': {
+                    'require_both_stages': True
                 }
             }
+        }
         
         # Advanced settings
         with st.expander("🔧 Advanced Settings"):
@@ -1298,7 +1298,7 @@ def main() -> None:
                      else ['...'] * len(sample_cols)
                 for i, col in enumerate(sample_cols)
             })
-            st.dataframe(sample_data, width='stretch')
+            st.dataframe(sample_data, use_container_width=True)
     
     # Reporter Hits Tab
     if reporter_hits_tab is not None:
@@ -1405,7 +1405,7 @@ def main() -> None:
                                 if col in reporter_display.columns and pd.api.types.is_numeric_dtype(reporter_display[col]):
                                     reporter_display[col] = reporter_display[col].round(3)
                             
-                            st.dataframe(reporter_display, width='stretch', height=400)
+                            st.dataframe(reporter_display, use_container_width=True, height=400)
                             
                             # Download reporter hits
                             reporter_csv = reporter_display.to_csv(index=False)
@@ -1531,7 +1531,7 @@ def main() -> None:
                                     else:
                                         vitality_display[col] = vitality_display[col].round(3)
                             
-                            st.dataframe(vitality_display, width='stretch', height=400)
+                            st.dataframe(vitality_display, use_container_width=True, height=400)
                             
                             # Download vitality hits
                             vitality_csv = vitality_display.to_csv(index=False)
