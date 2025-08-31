@@ -711,60 +711,75 @@ def main() -> None:
                     metadata = current_data['metadata']
                     st.success(f"✅ {metadata['total_wells']} wells processed successfully")
         
-        # Hit calling is always multi-stage for dual-readout screening
-        st.subheader("🔬 Hit Calling Pipeline")
-        st.info("**Stage 1:** Reporter Hits → **Stage 2:** Vitality Hits → **Stage 3:** Platform Hits")
+        # Determine what files to process
+        files_to_process = uploaded_files
+        if use_sample_data and hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
+            files_to_process = st.session_state.sample_data
         
-        # Configuration parameters
-        st.subheader("⚙️ Parameters")
-        
-        viability_threshold = st.slider(
-            "Viability Gate Threshold (f)",
-            min_value=0.1,
-            max_value=1.0,
-            value=config.get('processing', {}).get('viability_threshold', 0.3),
-            step=0.1,
-            help="Wells with ATP < f × median(ATP) are flagged as low viability. Uses BacTiter luminescence assay - D-luciferin + cellular ATP → light via luciferase."
+        # Process data button - moved to top of sidebar area
+        st.divider()
+        process_data = st.button(
+            "🔄 Process Data", 
+            type="primary", 
+            disabled=not files_to_process,
+            help="Process the uploaded or sample data with current parameters",
+            use_container_width=True
         )
         
-        z_cutoff = st.number_input(
-            "Z-score Cutoff for Hits",
-            min_value=1.0,
-            max_value=5.0,
-            value=config.get('processing', {}).get('z_score_cutoff', 2.0),
-            step=0.1,
-            help="Minimum robust Z-score (MAD-based) to consider a potential hit. Formula: Z = (x - median) / (1.4826 × MAD), where MAD = median(|x - median(x)|). Resistant to outliers and non-normal distributions."
-        )
-        
-        top_n = st.number_input(
-            "Top N Hits to Display",
-            min_value=10,
-            max_value=1000,
-            value=config.get('processing', {}).get('top_n_hits', 50),
-            step=10,
-            help="Number of top hits to show in the hits table"
-        )
-        
-        apply_b_scoring = st.checkbox(
-            "Apply B-scoring",
-            value=config.get('bscore', {}).get('enabled', False),
-            help="Apply median-polish row/column bias correction to remove spatial artifacts. Important for plates with edge effects or systematic row/column bias."
-        )
-        
-        # Hit calling configuration panel
-        with st.expander("🎯 Hit Calling Thresholds", expanded=True):
-            st.write("**Reporter Hit Detection (Stage 1)**")
-            col1, col2 = st.columns(2)
+        # Parameters section - collapsed into expander
+        with st.expander("⚙️ Parameters", expanded=True):
+            # Hit calling is always multi-stage for dual-readout screening
+            st.subheader("🔬 Hit Calling Pipeline")
+            st.info("**Stage 1:** Reporter Hits → **Stage 2:** Vitality Hits → **Stage 3:** Platform Hits")
             
-            with col1:
-                z_threshold_lptA = st.number_input(
-                    "lptA Z-score threshold",
-                    min_value=1.0,
-                    max_value=5.0,
-                    value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
-                    step=0.1,
-                    help="Minimum Z-score for lptA reporter hits. LptA (periplasmic bridge protein) is upregulated by σE during LPS transport stress and OM destabilization."
-                )
+            # Configuration parameters
+            viability_threshold = st.slider(
+                "Viability Gate Threshold (f)",
+                min_value=0.1,
+                max_value=1.0,
+                value=config.get('processing', {}).get('viability_threshold', 0.3),
+                step=0.1,
+                help="Wells with ATP < f × median(ATP) are flagged as low viability. Uses BacTiter luminescence assay - D-luciferin + cellular ATP → light via luciferase."
+            )
+        
+            z_cutoff = st.number_input(
+                "Z-score Cutoff for Hits",
+                min_value=1.0,
+                max_value=5.0,
+                value=config.get('processing', {}).get('z_score_cutoff', 2.0),
+                step=0.1,
+                help="Minimum robust Z-score (MAD-based) to consider a potential hit. Formula: Z = (x - median) / (1.4826 × MAD), where MAD = median(|x - median(x)|). Resistant to outliers and non-normal distributions."
+            )
+        
+            top_n = st.number_input(
+                "Top N Hits to Display",
+                min_value=10,
+                max_value=1000,
+                value=config.get('processing', {}).get('top_n_hits', 50),
+                step=10,
+                help="Number of top hits to show in the hits table"
+            )
+        
+            apply_b_scoring = st.checkbox(
+                "Apply B-scoring",
+                value=config.get('bscore', {}).get('enabled', False),
+                help="Apply median-polish row/column bias correction to remove spatial artifacts. Important for plates with edge effects or systematic row/column bias."
+            )
+            
+            # Hit calling configuration panel
+            with st.expander("🎯 Hit Calling Thresholds", expanded=True):
+                st.write("**Reporter Hit Detection (Stage 1)**")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    z_threshold_lptA = st.number_input(
+                        "lptA Z-score threshold",
+                        min_value=1.0,
+                        max_value=5.0,
+                        value=config.get('hit_calling', {}).get('reporter', {}).get('z_threshold_lptA', 2.0),
+                        step=0.1,
+                        help="Minimum Z-score for lptA reporter hits. LptA (periplasmic bridge protein) is upregulated by σE during LPS transport stress and OM destabilization."
+                    )
             
             with col2:
                 z_threshold_ldtD = st.number_input(
@@ -862,21 +877,6 @@ def main() -> None:
             
             if not column_mapping:
                 column_mapping = None
-        
-        # Determine what files to process
-        files_to_process = uploaded_files
-        if use_sample_data and hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
-            files_to_process = st.session_state.sample_data
-        
-        # Process data button - moved to top of sidebar area
-        st.divider()
-        process_data = st.button(
-            "🔄 Process Data", 
-            type="primary", 
-            disabled=not files_to_process,
-            help="Process the uploaded or sample data with current parameters",
-            use_container_width=True
-        )
         
         # Methodology and Scientific Background
         st.divider()
