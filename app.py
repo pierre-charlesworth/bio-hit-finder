@@ -1751,16 +1751,23 @@ def main() -> None:
             heatmap_col1, heatmap_col2, heatmap_col3 = st.columns(3)
             
             with heatmap_col1:
-                # Metric selection
-                available_metrics = []
-                for metric in ['Z_lptA', 'Z_ldtD', 'B_Z_lptA', 'B_Z_ldtD', 'Ratio_lptA', 'Ratio_ldtD', 'OD_norm_WT', 'OD_norm_tolC', 'OD_norm_SA']:
-                    if metric in df.columns:
-                        available_metrics.append(metric)
+                # Data type selection
+                data_type_options = []
                 
-                selected_metric = st.selectbox(
-                    "Metric:",
-                    available_metrics,
-                    help="Select metric to visualize in heatmap"
+                # Check which data types are available
+                if any(col in df.columns for col in ['BG_lptA', 'BT_lptA', 'BG_ldtD', 'BT_ldtD']):
+                    data_type_options.append("Raw Signals")
+                if any(col in df.columns for col in ['Ratio_lptA', 'Ratio_ldtD']):
+                    data_type_options.append("Ratios")
+                if any(col in df.columns for col in ['Z_lptA', 'Z_ldtD', 'B_Z_lptA', 'B_Z_ldtD']):
+                    data_type_options.append("Z-Scores")
+                if any(col in df.columns for col in ['OD_WT', 'OD_tolC', 'OD_SA', 'OD_norm_WT', 'OD_norm_tolC', 'OD_norm_SA']):
+                    data_type_options.append("Viability")
+                
+                selected_data_type = st.selectbox(
+                    "Data Type:",
+                    data_type_options,
+                    help="Select type of data to visualize across all plates"
                 )
             
             with heatmap_col2:
@@ -1773,105 +1780,103 @@ def main() -> None:
                 )
             
             with heatmap_col3:
-                # Display mode
-                display_mode = st.selectbox(
-                    "Display Mode:",
-                    ["All plates in family", "Single plate comparison"],
-                    help="Choose how to display the heatmaps"
+                # Edge effects overlay
+                show_edge_effects = st.checkbox(
+                    "Show Edge Effects",
+                    value=True,
+                    help="Highlight wells with detected edge effects"
                 )
             
-            if selected_metric and selected_family:
+            if selected_data_type and selected_family:
                 family_plates = plate_families[selected_family]
                 
-                if display_mode == "All plates in family":
-                    st.subheader(f"All Plates for Extract {selected_family}")
-                    
-                    # Show info about the plates in this family
-                    st.info(f"📊 Showing {len(family_plates)} plates: {', '.join(family_plates)}")
-                    
-                    # Filter data for this family
-                    family_df = df[df['PlateID'].isin(family_plates)]
-                    
-                    # Check if we have data for the selected metric across these plates
-                    plates_with_data = family_df[family_df[selected_metric].notna()]['PlateID'].unique()
-                    
-                    if len(plates_with_data) > 0:
-                        # Create a grid of heatmaps
-                        n_plates = len(plates_with_data)
-                        if n_plates <= 2:
-                            cols = min(n_plates, 2)
-                            rows = 1
-                        elif n_plates <= 4:
-                            cols = 2
-                            rows = 2
-                        elif n_plates <= 6:
-                            cols = 3
-                            rows = 2
-                        else:
-                            cols = 3
-                            rows = (n_plates + 2) // 3
-                        
-                        # Display heatmaps in a grid
-                        for row in range(rows):
-                            plate_cols = st.columns(cols)
-                            for col in range(cols):
-                                plate_idx = row * cols + col
-                                if plate_idx < len(plates_with_data):
-                                    plate_id = plates_with_data[plate_idx]
-                                    with plate_cols[col]:
-                                        try:
-                                            fig = create_plate_heatmap(df, selected_metric, plate_id)
-                                            fig.update_layout(
-                                                title=dict(text=f"{plate_id}", font=dict(size=14)),
-                                                height=300,
-                                                width=350
-                                            )
-                                            st.plotly_chart(fig, use_container_width=True)
-                                        except Exception as e:
-                                            st.error(f"Error creating heatmap for {plate_id}: {str(e)}")
+                # Define metrics based on data type
+                metrics_to_show = []
+                if selected_data_type == "Raw Signals":
+                    metrics_to_show = [('BG_lptA', 'Beta-gal lptA'), ('BT_lptA', 'BacTiter lptA'), 
+                                     ('BG_ldtD', 'Beta-gal ldtD'), ('BT_ldtD', 'BacTiter ldtD')]
+                elif selected_data_type == "Ratios":
+                    metrics_to_show = [('Ratio_lptA', 'Ratio lptA'), ('Ratio_ldtD', 'Ratio ldtD')]
+                elif selected_data_type == "Z-Scores":
+                    metrics_to_show = [('Z_lptA', 'Z-score lptA'), ('Z_ldtD', 'Z-score ldtD')]
+                    if 'B_Z_lptA' in df.columns:
+                        metrics_to_show.extend([('B_Z_lptA', 'B-score lptA'), ('B_Z_ldtD', 'B-score ldtD')])
+                elif selected_data_type == "Viability":
+                    # Prefer normalized OD if available, otherwise use raw OD
+                    if any(col in df.columns for col in ['OD_norm_WT', 'OD_norm_tolC', 'OD_norm_SA']):
+                        metrics_to_show = [('OD_norm_WT', 'OD WT (norm)'), ('OD_norm_tolC', 'OD tolC (norm)'), ('OD_norm_SA', 'OD SA (norm)')]
                     else:
-                        st.warning(f"No data found for metric '{selected_metric}' in any plates from extract {selected_family}")
+                        metrics_to_show = [('OD_WT', 'OD WT'), ('OD_tolC', 'OD tolC'), ('OD_SA', 'OD SA')]
                 
-                else:  # Single plate comparison mode
-                    st.subheader(f"Single Plate Comparison - Extract {selected_family}")
+                # Filter to only show metrics that exist in the data
+                available_metrics = [(metric, label) for metric, label in metrics_to_show if metric in df.columns]
+                
+                if available_metrics:
+                    st.subheader(f"{selected_data_type} - Extract {selected_family}")
+                    st.info(f"📊 Showing {len(available_metrics)} {selected_data_type.lower()} heatmaps")
                     
-                    # Plate selection within the family
-                    selected_plate = st.selectbox(
-                        "Select Plate:",
-                        family_plates,
-                        help="Select specific plate to visualize"
-                    )
+                    # Get edge effects results if available
+                    edge_results = st.session_state.get('edge_results', [])
+                    edge_warnings = {}
+                    if show_edge_effects and edge_results:
+                        for result in edge_results:
+                            if result.plate_id == selected_family:  # Match by family
+                                edge_warnings[result.metric] = result.warning_level
                     
-                    if selected_plate:
-                        # Create side-by-side heatmaps
-                        heatmap_col_left, heatmap_col_right = st.columns(2)
-                        
-                        with heatmap_col_left:
-                            # Selected metric heatmap
-                            fig_main = create_plate_heatmap(df, selected_metric, selected_plate)
-                            fig_main.update_layout(title=f"{selected_metric} - {selected_plate}")
-                            st.plotly_chart(fig_main, use_container_width=True)
-                        
-                        with heatmap_col_right:
-                            # Comparison metric (alternate between Z and B-score if available)
-                            comparison_metric = None
-                            if selected_metric == 'Z_lptA' and 'B_Z_lptA' in df.columns:
-                                comparison_metric = 'B_Z_lptA'
-                            elif selected_metric == 'B_Z_lptA' and 'Z_lptA' in df.columns:
-                                comparison_metric = 'Z_lptA'
-                            elif selected_metric == 'Z_ldtD' and 'B_Z_ldtD' in df.columns:
-                                comparison_metric = 'B_Z_ldtD'
-                            elif selected_metric == 'B_Z_ldtD' and 'Z_ldtD' in df.columns:
-                                comparison_metric = 'Z_ldtD'
-                            elif 'Ratio_lptA' in df.columns and selected_metric != 'Ratio_lptA':
-                                comparison_metric = 'Ratio_lptA'
-                            
-                            if comparison_metric:
-                                fig_comparison = create_plate_heatmap(df, comparison_metric, selected_plate)
-                                fig_comparison.update_layout(title=f"{comparison_metric} - {selected_plate}")
-                                st.plotly_chart(fig_comparison, use_container_width=True)
-                            else:
-                                st.info("No suitable comparison metric available")
+                    # Create grid layout based on number of metrics
+                    n_metrics = len(available_metrics)
+                    if n_metrics <= 2:
+                        cols = n_metrics
+                        rows = 1
+                    elif n_metrics <= 4:
+                        cols = 2
+                        rows = 2
+                    elif n_metrics <= 6:
+                        cols = 3
+                        rows = 2
+                    else:
+                        cols = 4
+                        rows = (n_metrics + 3) // 4
+                    
+                    # Display heatmaps in grid
+                    for row in range(rows):
+                        metric_cols = st.columns(cols)
+                        for col in range(cols):
+                            metric_idx = row * cols + col
+                            if metric_idx < len(available_metrics):
+                                metric, label = available_metrics[metric_idx]
+                                with metric_cols[col]:
+                                    try:
+                                        # Find the best plate with this metric data
+                                        family_df = df[df['PlateID'].isin(family_plates)]
+                                        plates_with_metric = family_df[family_df[metric].notna()]['PlateID'].unique()
+                                        
+                                        if len(plates_with_metric) > 0:
+                                            # Use the first plate with data for this metric
+                                            plate_id = plates_with_metric[0]
+                                            
+                                            fig = create_plate_heatmap(df, metric, plate_id)
+                                            fig.update_layout(
+                                                title=dict(text=f"{label}<br>{plate_id}", font=dict(size=12)),
+                                                height=300,
+                                                margin=dict(t=60, b=40, l=40, r=40)
+                                            )
+                                            
+                                            # Add edge effects warning if available
+                                            if show_edge_effects and metric in edge_warnings:
+                                                warning_level = edge_warnings[metric]
+                                                if warning_level != WarningLevel.INFO:
+                                                    warning_color = "🟨" if warning_level == WarningLevel.WARN else "🟥"
+                                                    st.caption(f"{warning_color} Edge effects detected")
+                                            
+                                            st.plotly_chart(fig, use_container_width=True)
+                                        else:
+                                            st.warning(f"No data for {label}")
+                                            
+                                    except Exception as e:
+                                        st.error(f"Error creating {label} heatmap: {str(e)}")
+                else:
+                    st.warning(f"No {selected_data_type.lower()} data available for extract {selected_family}")
         else:
             st.info("👆 Process plate data first to see heatmaps.")
     
