@@ -421,6 +421,41 @@ def render_edge_effect_badge(warning_level: WarningLevel) -> str:
     return f'<span class="badge {color_class}">{warning_level.value}</span>'
 
 
+def get_plate_families(df: pd.DataFrame) -> Dict[str, List[str]]:
+    """
+    Group plates by their parent microbial extract number.
+    
+    Example: plates 441, 441-lptA-BG, 441-lptA-BT, 441-ldtD-BG, etc.
+    would all be grouped under parent extract '441'.
+    """
+    if 'PlateID' not in df.columns:
+        return {}
+    
+    families = {}
+    plate_ids = df['PlateID'].unique()
+    
+    for plate_id in plate_ids:
+        plate_str = str(plate_id)
+        
+        # Extract the base number (parent extract)
+        # Handle formats like '441', '441-lptA-BG', 'DEMO001', etc.
+        if '-' in plate_str:
+            base_id = plate_str.split('-')[0]
+        else:
+            base_id = plate_str
+            
+        # Group plates by base ID
+        if base_id not in families:
+            families[base_id] = []
+        families[base_id].append(plate_id)
+    
+    # Sort plates within each family
+    for base_id in families:
+        families[base_id] = sorted(families[base_id])
+    
+    return families
+
+
 def create_plate_heatmap(df: pd.DataFrame, metric: str, plate_id: str) -> go.Figure:
     """Create a heatmap for a single plate."""
     plate_df = df[df['PlateID'] == plate_id].copy() if 'PlateID' in df.columns else df.copy()
@@ -1709,8 +1744,11 @@ def main() -> None:
         st.header("Heatmaps")
         
         if df is not None and len(df) > 0 and 'PlateID' in df.columns:
+            # Get plate families
+            plate_families = get_plate_families(df)
+            
             # Controls
-            heatmap_col1, heatmap_col2 = st.columns(2)
+            heatmap_col1, heatmap_col2, heatmap_col3 = st.columns(3)
             
             with heatmap_col1:
                 # Metric selection
@@ -1726,42 +1764,114 @@ def main() -> None:
                 )
             
             with heatmap_col2:
-                # Plate selection
-                plate_ids = sorted(df['PlateID'].unique())
-                selected_plate = st.selectbox(
-                    "Plate:",
-                    plate_ids,
-                    help="Select plate to visualize"
+                # Extract family selection
+                extract_families = sorted(plate_families.keys())
+                selected_family = st.selectbox(
+                    "Microbial Extract:",
+                    extract_families,
+                    help="Select microbial extract to show all associated plates"
                 )
             
-            if selected_metric and selected_plate:
-                # Create side-by-side heatmaps
-                heatmap_col_left, heatmap_col_right = st.columns(2)
+            with heatmap_col3:
+                # Display mode
+                display_mode = st.selectbox(
+                    "Display Mode:",
+                    ["All plates in family", "Single plate comparison"],
+                    help="Choose how to display the heatmaps"
+                )
+            
+            if selected_metric and selected_family:
+                family_plates = plate_families[selected_family]
                 
-                with heatmap_col_left:
-                    # Selected metric heatmap
-                    fig_main = create_plate_heatmap(df, selected_metric, selected_plate)
-                    st.plotly_chart(fig_main, width='stretch')
-                
-                with heatmap_col_right:
-                    # Comparison metric (alternate between Z and B-score if available)
-                    comparison_metric = None
-                    if selected_metric == 'Z_lptA' and 'B_Z_lptA' in df.columns:
-                        comparison_metric = 'B_Z_lptA'
-                    elif selected_metric == 'B_Z_lptA' and 'Z_lptA' in df.columns:
-                        comparison_metric = 'Z_lptA'
-                    elif selected_metric == 'Z_ldtD' and 'B_Z_ldtD' in df.columns:
-                        comparison_metric = 'B_Z_ldtD'
-                    elif selected_metric == 'B_Z_ldtD' and 'Z_ldtD' in df.columns:
-                        comparison_metric = 'Z_ldtD'
-                    elif 'Ratio_lptA' in df.columns and selected_metric != 'Ratio_lptA':
-                        comparison_metric = 'Ratio_lptA'
+                if display_mode == "All plates in family":
+                    st.subheader(f"All Plates for Extract {selected_family}")
                     
-                    if comparison_metric:
-                        fig_comparison = create_plate_heatmap(df, comparison_metric, selected_plate)
-                        st.plotly_chart(fig_comparison, width='stretch')
+                    # Show info about the plates in this family
+                    st.info(f"📊 Showing {len(family_plates)} plates: {', '.join(family_plates)}")
+                    
+                    # Filter data for this family
+                    family_df = df[df['PlateID'].isin(family_plates)]
+                    
+                    # Check if we have data for the selected metric across these plates
+                    plates_with_data = family_df[family_df[selected_metric].notna()]['PlateID'].unique()
+                    
+                    if len(plates_with_data) > 0:
+                        # Create a grid of heatmaps
+                        n_plates = len(plates_with_data)
+                        if n_plates <= 2:
+                            cols = min(n_plates, 2)
+                            rows = 1
+                        elif n_plates <= 4:
+                            cols = 2
+                            rows = 2
+                        elif n_plates <= 6:
+                            cols = 3
+                            rows = 2
+                        else:
+                            cols = 3
+                            rows = (n_plates + 2) // 3
+                        
+                        # Display heatmaps in a grid
+                        for row in range(rows):
+                            plate_cols = st.columns(cols)
+                            for col in range(cols):
+                                plate_idx = row * cols + col
+                                if plate_idx < len(plates_with_data):
+                                    plate_id = plates_with_data[plate_idx]
+                                    with plate_cols[col]:
+                                        try:
+                                            fig = create_plate_heatmap(df, selected_metric, plate_id)
+                                            fig.update_layout(
+                                                title=dict(text=f"{plate_id}", font=dict(size=14)),
+                                                height=300,
+                                                width=350
+                                            )
+                                            st.plotly_chart(fig, use_container_width=True)
+                                        except Exception as e:
+                                            st.error(f"Error creating heatmap for {plate_id}: {str(e)}")
                     else:
-                        st.info("No suitable comparison metric available")
+                        st.warning(f"No data found for metric '{selected_metric}' in any plates from extract {selected_family}")
+                
+                else:  # Single plate comparison mode
+                    st.subheader(f"Single Plate Comparison - Extract {selected_family}")
+                    
+                    # Plate selection within the family
+                    selected_plate = st.selectbox(
+                        "Select Plate:",
+                        family_plates,
+                        help="Select specific plate to visualize"
+                    )
+                    
+                    if selected_plate:
+                        # Create side-by-side heatmaps
+                        heatmap_col_left, heatmap_col_right = st.columns(2)
+                        
+                        with heatmap_col_left:
+                            # Selected metric heatmap
+                            fig_main = create_plate_heatmap(df, selected_metric, selected_plate)
+                            fig_main.update_layout(title=f"{selected_metric} - {selected_plate}")
+                            st.plotly_chart(fig_main, use_container_width=True)
+                        
+                        with heatmap_col_right:
+                            # Comparison metric (alternate between Z and B-score if available)
+                            comparison_metric = None
+                            if selected_metric == 'Z_lptA' and 'B_Z_lptA' in df.columns:
+                                comparison_metric = 'B_Z_lptA'
+                            elif selected_metric == 'B_Z_lptA' and 'Z_lptA' in df.columns:
+                                comparison_metric = 'Z_lptA'
+                            elif selected_metric == 'Z_ldtD' and 'B_Z_ldtD' in df.columns:
+                                comparison_metric = 'B_Z_ldtD'
+                            elif selected_metric == 'B_Z_ldtD' and 'Z_ldtD' in df.columns:
+                                comparison_metric = 'Z_ldtD'
+                            elif 'Ratio_lptA' in df.columns and selected_metric != 'Ratio_lptA':
+                                comparison_metric = 'Ratio_lptA'
+                            
+                            if comparison_metric:
+                                fig_comparison = create_plate_heatmap(df, comparison_metric, selected_plate)
+                                fig_comparison.update_layout(title=f"{comparison_metric} - {selected_plate}")
+                                st.plotly_chart(fig_comparison, use_container_width=True)
+                            else:
+                                st.info("No suitable comparison metric available")
         else:
             st.info("👆 Process plate data first to see heatmaps.")
     
