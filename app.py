@@ -1692,28 +1692,26 @@ def main() -> None:
                     )
                     fig1.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
                     fig1.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
-                    st.plotly_chart(fig1, width='stretch')
+                    st.plotly_chart(fig1, use_container_width=True)
                 else:
                     st.warning("Z_lptA column not available")
             
             with viz_col2:
-                # Histogram of B_Z_lptA (if available)
-                st.subheader("B-score Z_lptA Distribution")
-                if apply_b_scoring and 'B_Z_lptA' in df.columns:
+                # Histogram of Raw Z_ldtD
+                st.subheader("Raw Z_ldtD Distribution")
+                if 'Z_ldtD' in df.columns:
                     fig2 = px.histogram(
                         df, 
-                        x='B_Z_lptA', 
+                        x='Z_ldtD', 
                         nbins=50,
-                        title="B-score Z_lptA Distribution",
-                        color_discrete_sequence=['orange']
+                        title="Raw Z_ldtD Distribution",
+                        color_discrete_sequence=['darkgreen']
                     )
                     fig2.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
                     fig2.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
-                    st.plotly_chart(fig2, width='stretch')
-                elif apply_b_scoring:
-                    st.warning("B_Z_lptA column not available")
+                    st.plotly_chart(fig2, use_container_width=True)
                 else:
-                    st.info("B-scoring not enabled")
+                    st.warning("Z_ldtD column not available")
             
             # Second row
             viz_col3, viz_col4 = st.columns(2)
@@ -1730,7 +1728,7 @@ def main() -> None:
                         title="Ratio_lptA vs Ratio_ldtD",
                         hover_data=['Well'] if 'Well' in df.columns else None
                     )
-                    st.plotly_chart(fig3, width='stretch')
+                    st.plotly_chart(fig3, use_container_width=True)
                 else:
                     st.warning("Required ratio columns not available")
             
@@ -1738,17 +1736,38 @@ def main() -> None:
                 # Viability counts by plate
                 st.subheader("Viability by Plate")
                 if 'viable_lptA' in df.columns and 'PlateID' in df.columns:
-                    viability_counts = df.groupby('PlateID')['viable_lptA'].value_counts().unstack(fill_value=0)
+                    # Create a proper DataFrame for the bar chart
+                    viability_summary = df.groupby('PlateID')['viable_lptA'].value_counts().unstack(fill_value=0)
+                    
+                    # Create the DataFrame in the right format for plotly
+                    plot_data = []
+                    for plate in viability_summary.index:
+                        viable_count = viability_summary.loc[plate].get(True, 0)
+                        non_viable_count = viability_summary.loc[plate].get(False, 0)
+                        
+                        plot_data.append({
+                            'PlateID': plate,
+                            'Status': 'Viable',
+                            'Count': viable_count
+                        })
+                        plot_data.append({
+                            'PlateID': plate,
+                            'Status': 'Non-Viable',
+                            'Count': non_viable_count
+                        })
+                    
+                    plot_df = pd.DataFrame(plot_data)
                     
                     fig4 = px.bar(
-                        x=viability_counts.index,
-                        y=[viability_counts[True], viability_counts[False]],
-                        title="Viability Counts by Plate",
-                        labels={'x': 'PlateID', 'y': 'Count'},
-                        color_discrete_map={0: 'lightcoral', 1: 'lightblue'}
+                        plot_df,
+                        x='PlateID',
+                        y='Count',
+                        color='Status',
+                        title="Viability Counts by Plate (lptA)",
+                        color_discrete_map={'Viable': 'lightblue', 'Non-Viable': 'lightcoral'}
                     )
                     fig4.update_layout(showlegend=True)
-                    st.plotly_chart(fig4, width='stretch')
+                    st.plotly_chart(fig4, use_container_width=True)
                 else:
                     st.warning("Viability data not available")
         else:
