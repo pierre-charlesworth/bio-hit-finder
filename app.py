@@ -579,14 +579,37 @@ def main() -> None:
     with st.sidebar:
         st.header("Configuration")
         
-        # File upload section
+        # Sample data toggle at the top
+        st.subheader("📊 Data Source")
+        use_sample_data = st.toggle(
+            "Use Sample Data", 
+            value=False,
+            help="Toggle to use pre-loaded sample data instead of uploading files"
+        )
+        
+        # File upload section (disabled if using sample data)
         st.subheader("📁 Data Upload")
         uploaded_files = st.file_uploader(
             "Choose plate data files",
             accept_multiple_files=True,
             type=['csv', 'xlsx', 'xls'],
-            help="Upload one or more plate datasets with required measurement columns"
+            help="Upload one or more plate datasets with required measurement columns",
+            disabled=use_sample_data
         )
+        
+        # Show sample data info when toggle is on
+        if use_sample_data:
+            st.info("📊 Using pre-loaded sample data for demonstration")
+            # Load sample data into session state
+            if 'sample_loaded' not in st.session_state or not st.session_state.sample_loaded:
+                try:
+                    with open('sample_plate_data.csv', 'rb') as f:
+                        sample_data = f.read()
+                    st.session_state.sample_loaded = True
+                    st.session_state.sample_data = {'sample_plate_data.csv': sample_data}
+                except FileNotFoundError:
+                    st.error("Sample data file not found. Please generate it first by running: python sample_data_generator.py")
+                    use_sample_data = False
         
         # Multi-sheet processing mode toggle
         if uploaded_files:
@@ -840,6 +863,21 @@ def main() -> None:
             if not column_mapping:
                 column_mapping = None
         
+        # Determine what files to process
+        files_to_process = uploaded_files
+        if use_sample_data and hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
+            files_to_process = st.session_state.sample_data
+        
+        # Process data button - moved to top of sidebar area
+        st.divider()
+        process_data = st.button(
+            "🔄 Process Data", 
+            type="primary", 
+            disabled=not files_to_process,
+            help="Process the uploaded or sample data with current parameters",
+            use_container_width=True
+        )
+        
         # Methodology and Scientific Background
         st.divider()
         with st.expander("🧬 Scientific Methodology", expanded=False):
@@ -873,29 +911,6 @@ def main() -> None:
             *Funded by the European Union*
             """)
         
-        # Sample data load option
-        st.write("**Or load sample data:**")
-        if st.button("🎯 Load Sample Data", help="Load sample plate data directly to test the platform"):
-            # Load pre-generated sample CSV file
-            try:
-                with open('sample_plate_data.csv', 'rb') as f:
-                    sample_data = f.read()
-                
-                # Store in session state to simulate file upload
-                st.session_state.sample_loaded = True
-                st.session_state.sample_data = {'sample_plate_data.csv': sample_data}
-                st.rerun()
-            except FileNotFoundError:
-                st.error("Sample data file not found. Please generate it first by running: python sample_data_generator.py")
-        
-        # Use sample data if loaded, otherwise use uploaded files
-        files_to_process = uploaded_files
-        if hasattr(st.session_state, 'sample_loaded') and st.session_state.sample_loaded:
-            files_to_process = st.session_state.sample_data
-            st.info("Sample data loaded! Click 'Process Data' to analyze.")
-        
-        # Process data button
-        process_data = st.button("Process Data", type="primary", disabled=not files_to_process)
         
         # Process files when button is clicked
         if process_data:
