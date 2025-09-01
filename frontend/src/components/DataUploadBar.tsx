@@ -19,7 +19,12 @@ import {
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
-const DataUploadBar = () => {
+interface DataUploadBarProps {
+  onStatusChange?: (status: 'none' | 'uploaded' | 'sample' | 'processing' | 'error') => void;
+  onFileNameChange?: (fileName: string) => void;
+}
+
+const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParametersExpanded, setIsParametersExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -35,10 +40,12 @@ const DataUploadBar = () => {
     mutationFn: api.uploadFile,
     onSuccess: (data) => {
       console.log('Upload successful:', data);
+      onStatusChange?.('uploaded');
     },
     onError: (error) => {
       console.error('Upload failed:', error);
       setUploadedFile(null);
+      onStatusChange?.('error');
     },
   });
 
@@ -46,6 +53,8 @@ const DataUploadBar = () => {
     const file = event.target.files?.[0];
     if (file) {
       setUploadedFile(file);
+      onStatusChange?.('uploaded');
+      onFileNameChange?.(file.name);
     }
   };
 
@@ -55,6 +64,8 @@ const DataUploadBar = () => {
     const file = event.dataTransfer.files?.[0];
     if (file && file.type === 'text/csv') {
       setUploadedFile(file);
+      onStatusChange?.('uploaded');
+      onFileNameChange?.(file.name);
     }
   };
 
@@ -69,6 +80,7 @@ const DataUploadBar = () => {
   };
 
   const handleProcessData = () => {
+    onStatusChange?.('processing');
     if (uploadedFile) {
       uploadMutation.mutate(uploadedFile);
     } else if (useSampleData) {
@@ -85,31 +97,21 @@ const DataUploadBar = () => {
     if (newUseSampleData) {
       // Clear any uploaded file when using sample data
       setUploadedFile(null);
+      onStatusChange?.('sample');
+      onFileNameChange?.('');
+    } else {
+      onStatusChange?.('none');
+      onFileNameChange?.('');
     }
   };
 
-  const getStatusBadge = () => {
-    if (uploadMutation.isError) {
-      return <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Failed</Badge>;
-    }
-    if (uploadMutation.isPending) {
-      return <Badge variant="secondary" className="gap-1">Processing...</Badge>;
-    }
-    if (uploadedFile) {
-      return <Badge variant="secondary" className="gap-1"><CheckCircle className="h-3 w-3" />Ready</Badge>;
-    }
-    if (useSampleData) {
-      return <Badge variant="secondary" className="gap-1"><Database className="h-3 w-3" />Sample Data</Badge>;
-    }
-    return <Badge variant="outline" className="gap-1"><Upload className="h-3 w-3" />No Data</Badge>;
-  };
 
   return (
     <div className="fixed top-[73px] left-0 right-0 z-40 border-b bg-background/80 backdrop-blur-sm border-border">
       <div className="container-fluid max-w-7xl mx-auto">
         {/* Main Bar */}
         <div className="flex items-center justify-between py-3">
-          {/* Left Side - Upload Area and Sample Data Toggle */}
+          {/* Left Side - Upload Area */}
           <div className="flex items-center gap-4">
             <div
               className={`relative h-12 w-12 border-2 border-dashed rounded-lg transition-all duration-200 ${
@@ -148,41 +150,24 @@ const DataUploadBar = () => {
                 )}
               </label>
             </div>
-
-            {/* Sample Data Toggle */}
-            <div className="flex items-center gap-2">
-              <Label htmlFor="sample-data-toggle" className="text-sm font-medium">
-                Sample Data
-              </Label>
-              <Switch
-                id="sample-data-toggle"
-                checked={useSampleData}
-                onCheckedChange={handleSampleDataToggle}
-              />
-            </div>
             
-            {/* File Info */}
-            <div className="flex items-center gap-3">
-              {uploadedFile ? (
-                <div className="flex items-center gap-2">
-                  <div className="text-sm">
-                    <p className="font-medium truncate max-w-40">{uploadedFile.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                    </p>
-                  </div>
-                  {getStatusBadge()}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <div className={`text-sm ${useSampleData ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
-                    <p>{useSampleData ? 'Sample data selected' : 'Drop CSV file or click to upload'}</p>
-                    <p className="text-xs">{useSampleData ? 'Toggle off to upload files' : 'Max 50MB'}</p>
-                  </div>
-                  {getStatusBadge()}
-                </div>
-              )}
+            {/* Drop CSV Text */}
+            <div className={`text-sm ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+              <p>{useSampleData ? 'Upload disabled' : 'Drop CSV or click to upload'}</p>
+              <p className="text-xs">{useSampleData ? 'Toggle sample data off' : 'Max 50MB'}</p>
             </div>
+          </div>
+
+          {/* Center - Sample Data Toggle */}
+          <div className="flex items-center gap-2">
+            <Label htmlFor="sample-data-toggle" className="text-sm font-medium">
+              Sample Data
+            </Label>
+            <Switch
+              id="sample-data-toggle"
+              checked={useSampleData}
+              onCheckedChange={handleSampleDataToggle}
+            />
           </div>
 
           {/* Right Side - Action Buttons */}

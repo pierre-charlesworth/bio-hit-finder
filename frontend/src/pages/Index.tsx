@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import Header from '@/components/Header';
 import DataUploadBar from '@/components/DataUploadBar';
 import Hero from '@/components/Hero';
@@ -8,10 +9,16 @@ import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
 
 const Index = () => {
+  const [dataStatus, setDataStatus] = useState<'none' | 'uploaded' | 'sample' | 'processing' | 'error'>('none');
+  const [fileName, setFileName] = useState<string>('');
+
   return (
     <div className="min-h-screen">
-      <Header />
-      <DataUploadBar />
+      <Header dataStatus={dataStatus} fileName={fileName} />
+      <DataUploadBar 
+        onStatusChange={setDataStatus}
+        onFileNameChange={setFileName}
+      />
       <main>
         <Hero />
         <AnalysisDashboard />

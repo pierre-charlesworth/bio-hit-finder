@@ -1,8 +1,14 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Menu, X } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Menu, X, Upload, CheckCircle, AlertCircle, Database } from 'lucide-react';
 
-const Header = () => {
+interface HeaderProps {
+  dataStatus?: 'none' | 'uploaded' | 'sample' | 'processing' | 'error';
+  fileName?: string;
+}
+
+const Header = ({ dataStatus = 'none', fileName }: HeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navItems = [
@@ -11,13 +17,28 @@ const Header = () => {
     { label: 'Contact', href: '#contact' },
   ];
 
+  const getDataStatusBadge = () => {
+    switch (dataStatus) {
+      case 'error':
+        return <Badge variant="destructive" className="gap-1"><AlertCircle className="h-3 w-3" />Failed</Badge>;
+      case 'processing':
+        return <Badge variant="secondary" className="gap-1">Processing...</Badge>;
+      case 'uploaded':
+        return <Badge variant="secondary" className="gap-1"><CheckCircle className="h-3 w-3" />{fileName || 'Ready'}</Badge>;
+      case 'sample':
+        return <Badge variant="secondary" className="gap-1"><Database className="h-3 w-3" />Sample Data</Badge>;
+      default:
+        return <Badge variant="outline" className="gap-1"><Upload className="h-3 w-3" />No Data</Badge>;
+    }
+  };
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border">
       <div className="container-fluid max-w-7xl mx-auto">
         <div className="flex items-center justify-between py-4">
-          {/* Logo */}
-          <div className="text-xl font-medium tracking-tight">
-            Studio
+          {/* Data Status */}
+          <div className="flex items-center">
+            {getDataStatusBadge()}
           </div>
 
           {/* Desktop Navigation */}
