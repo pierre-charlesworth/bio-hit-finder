@@ -36,6 +36,25 @@ from .hit_calling import (
     format_hit_calling_report,
 )
 
+from .vitality_analysis import (
+    VitalityAnalyzer,
+    VitalityError,
+    VitalityConfig,
+    calculate_plate_medians,
+    calculate_od_percentages,
+    detect_vitality_hits,
+)
+
+from .multi_stage_hits import (
+    MultiStageHitCaller,
+    MultiStageConfig,
+    MultiStageError,
+    stage1_reporter_hits,
+    stage2_vitality_hits,
+    stage3_platform_hits,
+    run_multi_stage_analysis,
+)
+
 __all__ = [
     # B-scoring exports
     'median_polish',
@@ -59,4 +78,21 @@ __all__ = [
     'HitCallingError',
     'analyze_multi_plate_hits',
     'format_hit_calling_report',
+    
+    # Vitality analysis exports
+    'VitalityAnalyzer',
+    'VitalityError', 
+    'VitalityConfig',
+    'calculate_plate_medians',
+    'calculate_od_percentages',
+    'detect_vitality_hits',
+    
+    # Multi-stage hit calling exports
+    'MultiStageHitCaller',
+    'MultiStageConfig',
+    'MultiStageError',
+    'stage1_reporter_hits',
+    'stage2_vitality_hits', 
+    'stage3_platform_hits',
+    'run_multi_stage_analysis',
 ]
