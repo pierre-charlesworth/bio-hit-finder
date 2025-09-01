@@ -623,48 +623,181 @@ def apply_platform_hit_gate(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def process_multi_stage_hit_calling(df: pd.DataFrame, config: dict) -> pd.DataFrame:
-    """Apply complete multi-stage hit calling pipeline.
+    """Apply complete multi-stage hit calling pipeline using new analytics modules.
     
     Pipeline:
-    1. Calculate OD percentages (WT%, tolC%, SA%)
-    2. Apply Stage 1: Reporter hits (LumHit)
-    3. Apply Stage 2: Vitality hits (OMpatternOK)
-    4. Apply Stage 3: Platform hits (PlatformHit)
+    1. Detect dual-readout data format automatically
+    2. Apply Stage 1: Reporter hits (Z≥threshold AND PassViab)
+    3. Apply Stage 2: Vitality hits (growth pattern analysis)
+    4. Apply Stage 3: Platform hits (Stage1 AND Stage2)
     
     Args:
         df: Processed plate DataFrame (from process_single_plate)
         config: Configuration dictionary with hit calling parameters
         
     Returns:
-        DataFrame with all hit calling columns added
+        DataFrame with all multi-stage hit calling columns added
     """
-    logger.info("Starting multi-stage hit calling pipeline")
+    from ..analytics import (
+        MultiStageHitCaller, 
+        MultiStageConfig, 
+        VitalityConfig
+    )
+    
+    logger.info("Starting multi-stage hit calling pipeline with new analytics modules")
     
     try:
-        # Stage 0: Calculate OD percentages for vitality analysis
-        result_df = calculate_od_percentages(df)
+        # Check if this is dual-readout data
+        dual_readout_detected = _detect_dual_readout_format(df)
+        logger.info(f"Dual-readout format detected: {dual_readout_detected}")
         
-        # Stage 1: Reporter hit calling
+        if not dual_readout_detected:
+            logger.warning("Single-readout data detected, applying legacy hit calling only")
+            # For single-readout data, apply traditional hit calling
+            return _apply_legacy_hit_calling(df, config)
+        
+        # Configure multi-stage hit calling
+        vitality_config = VitalityConfig(
+            tolc_threshold=config.get('vitality_tolc_threshold', 0.8),
+            wt_threshold=config.get('vitality_wt_threshold', 0.8),
+            sa_threshold=config.get('vitality_sa_threshold', 0.8)
+        )
+        
+        multi_stage_config = MultiStageConfig(
+            z_threshold=config.get('z_threshold', 2.0),
+            viability_column=config.get('viability_column', 'PassViab'),
+            reporter_columns=config.get('reporter_columns', ['Z_lptA', 'Z_ldtD']),
+            vitality_config=vitality_config,
+            require_both_stages=config.get('require_both_stages', True)
+        )
+        
+        # Initialize multi-stage hit caller
+        hit_caller = MultiStageHitCaller(multi_stage_config)
+        
+        # Run full three-stage analysis
+        result_df, summary = hit_caller.run_full_analysis(df)
+        
+        # Add legacy column mappings for backward compatibility
+        result_df = _add_legacy_column_mappings(result_df)
+        
+        # Log summary
+        logger.info(f"Multi-stage analysis completed: "
+                   f"Stage1={summary['stage1_reporter_hits']}, "
+                   f"Stage2={summary['stage2_vitality_hits']}, " 
+                   f"Stage3={summary['stage3_platform_hits']}")
+        
+        return result_df
+        
+    except Exception as e:
+        logger.error(f"Multi-stage hit calling failed: {str(e)}")
+        # Fallback to legacy processing
+        logger.info("Falling back to legacy hit calling")
+        return _apply_legacy_hit_calling(df, config)
+
+
+def _detect_dual_readout_format(df: pd.DataFrame) -> bool:
+    """Detect if DataFrame contains dual-readout data format.
+    
+    Checks for presence of both reporter columns (BG/BT ratios or Z-scores)
+    and vitality columns (OD measurements for WT, tolC, SA strains).
+    
+    Args:
+        df: DataFrame to analyze
+        
+    Returns:
+        True if dual-readout format detected, False otherwise
+    """
+    # Check for reporter data (Z-scores or ratios)
+    reporter_cols = ['Z_lptA', 'Z_ldtD', 'Ratio_lptA', 'Ratio_ldtD']
+    has_reporter = any(col in df.columns for col in reporter_cols)
+    
+    # Check for vitality data (OD measurements)
+    vitality_cols = ['OD_WT', 'OD_tolC', 'OD_SA']
+    has_vitality = all(col in df.columns for col in vitality_cols)
+    
+    # Check for viability gating
+    has_viability = 'PassViab' in df.columns
+    
+    dual_readout = has_reporter and has_vitality and has_viability
+    
+    logger.debug(f"Format detection - Reporter: {has_reporter}, "
+                f"Vitality: {has_vitality}, Viability: {has_viability}")
+    
+    return dual_readout
+
+
+def _add_legacy_column_mappings(df: pd.DataFrame) -> pd.DataFrame:
+    """Add legacy column names for backward compatibility.
+    
+    Maps new multi-stage column names to expected legacy names:
+    - Stage1_ReporterHit -> LumHit (legacy reporter hit)
+    - Stage2_VitalityHit -> OMpatternOK (legacy vitality pattern)
+    - Stage3_PlatformHit -> PlatformHit (combined hit calling)
+    """
+    result_df = df.copy()
+    
+    # Map Stage 1 to legacy LumHit
+    if 'Stage1_ReporterHit' in result_df.columns:
+        result_df['LumHit'] = result_df['Stage1_ReporterHit']
+        result_df['reporter_hit'] = result_df['Stage1_ReporterHit']  # Internal compatibility
+    
+    # Map Stage 2 to legacy OMpatternOK
+    if 'Stage2_VitalityHit' in result_df.columns:
+        result_df['OMpatternOK'] = result_df['Stage2_VitalityHit']
+        result_df['vitality_hit'] = result_df['Stage2_VitalityHit']  # Internal compatibility
+    
+    # Map Stage 3 to PlatformHit
+    if 'Stage3_PlatformHit' in result_df.columns:
+        result_df['PlatformHit'] = result_df['Stage3_PlatformHit']
+        result_df['platform_hit'] = result_df['Stage3_PlatformHit']  # Internal compatibility
+    
+    return result_df
+
+
+def _apply_legacy_hit_calling(df: pd.DataFrame, config: dict) -> pd.DataFrame:
+    """Apply legacy hit calling for single-readout or fallback scenarios."""
+    logger.info("Applying legacy hit calling pipeline")
+    
+    result_df = df.copy()
+    
+    try:
+        # Legacy Stage 0: Calculate OD percentages if possible
+        if all(col in result_df.columns for col in ['OD_WT', 'OD_tolC', 'OD_SA']):
+            result_df = calculate_od_percentages(result_df)
+        
+        # Legacy Stage 1: Reporter hit calling
         result_df = apply_reporter_hit_gate(result_df, config)
         
-        # Stage 2: Vitality hit calling  
-        result_df = apply_vitality_hit_gate(result_df, config)
+        # Legacy Stage 2: Vitality hit calling if OD data available
+        if 'WT%' in result_df.columns:
+            result_df = apply_vitality_hit_gate(result_df, config)
+        else:
+            # No vitality data available
+            result_df['vitality_hit'] = False
+            result_df['OMpatternOK'] = False
         
-        # Stage 3: Platform hit calling
+        # Legacy Stage 3: Platform hit calling
         result_df = apply_platform_hit_gate(result_df)
         
-        # Log final summary
+        # Log summary
         total_wells = len(result_df)
         reporter_hits = result_df['reporter_hit'].sum()
         vitality_hits = result_df['vitality_hit'].sum()
         platform_hits = result_df['platform_hit'].sum()
         
-        logger.info(f"Multi-stage hit calling complete: {total_wells} wells total, "
+        logger.info(f"Legacy hit calling complete: {total_wells} wells total, "
                    f"{reporter_hits} reporter hits, {vitality_hits} vitality hits, "
                    f"{platform_hits} platform hits")
         
         return result_df
         
     except Exception as e:
-        logger.error(f"Multi-stage hit calling failed: {e}")
-        raise
+        logger.error(f"Legacy hit calling failed: {str(e)}")
+        # Return DataFrame with minimal hit calling columns
+        result_df['reporter_hit'] = False
+        result_df['vitality_hit'] = False
+        result_df['platform_hit'] = False
+        result_df['LumHit'] = False
+        result_df['OMpatternOK'] = False
+        result_df['PlatformHit'] = False
+        return result_df
