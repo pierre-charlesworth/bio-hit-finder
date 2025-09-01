@@ -178,6 +178,28 @@ async def get_multi_stage_defaults():
         "include_partial_hits": True
     }
 
+@app.get("/api/v1/config/analysis-defaults")
+async def get_analysis_defaults():
+    """Get default configuration parameters for analysis dashboard."""
+    return {
+        "z_score_threshold": 2.0,
+        "viability_gate": 0.3,
+        "b_score_iterations": 5,
+        "edge_effect_warning_threshold": 0.15,
+        "min_od_value": 0.001,
+        "robust_zscore_mad_factor": 1.4826,
+        "viability_factors": {
+            "default": 0.3,
+            "strict": 0.5,
+            "relaxed": 0.2
+        },
+        "quality_control": {
+            "edge_well_detection": True,
+            "spatial_correction": True,
+            "outlier_detection": True
+        }
+    }
+
 @app.post("/api/v1/analyze/demo")
 async def analyze_demo_data(config: Optional[Dict[str, Any]] = None):
     """Analyze demo dual-readout data for testing multi-stage functionality.

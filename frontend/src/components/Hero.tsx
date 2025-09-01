@@ -3,16 +3,27 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Circle } from 'lucide-react';
 import { useApiTest, useDemoAnalysis } from '@/hooks/useApi';
 import { useToast } from '@/hooks/use-toast';
+import { useAnalysis } from '@/contexts/AnalysisContext';
 
 const Hero = () => {
   const { data: apiTest, isLoading, isError } = useApiTest();
   const { toast } = useToast();
   const demoMutation = useDemoAnalysis();
+  const { setCurrentAnalysis, setIsAnalyzing, setAnalysisError } = useAnalysis();
 
   const handleDemoClick = () => {
+    // Start analysis state
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    
     demoMutation.mutate({}, {
       onSuccess: (data) => {
         console.log('Demo analysis completed:', data);
+        
+        // Store analysis results in context
+        setCurrentAnalysis(data);
+        setIsAnalyzing(false);
+        
         toast({
           title: "Demo Analysis Complete",
           description: `Found ${data.summary?.stage3_platform_hits || 0} platform hits out of ${data.total_wells} wells`,
@@ -20,6 +31,11 @@ const Hero = () => {
       },
       onError: (error) => {
         console.error('Demo analysis failed:', error);
+        
+        // Update error state
+        setIsAnalyzing(false);
+        setAnalysisError(error.message || 'Demo analysis failed');
+        
         toast({
           title: "Demo Analysis Failed",
           description: "There was an error running the demo analysis",

@@ -104,6 +104,9 @@ export const api = {
 
   getMultiStageDefaults: () =>
     apiRequest<any>('/v1/config/multi-stage-defaults'),
+
+  getAnalysisDefaults: () =>
+    apiRequest<any>('/v1/config/analysis-defaults'),
 };
 
 export type { ApiError };

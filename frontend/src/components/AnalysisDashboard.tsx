@@ -1,15 +1,33 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, AlertTriangle, Download, Eye } from 'lucide-react';
+import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2 } from 'lucide-react';
+import { useAnalysis } from '@/contexts/AnalysisContext';
+import { useAnalysisDefaults } from '@/hooks/useApi';
 
 const AnalysisDashboard = () => {
-  const mockResults = {
-    totalWells: 1536,
-    hits: 47,
-    hitRate: 3.1,
-    plateCount: 4,
-    processingTime: "1.2s"
+  const { currentAnalysis, isAnalyzing } = useAnalysis();
+  const { data: analysisDefaults, isLoading: configLoading } = useAnalysisDefaults();
+
+  // Calculate actual results from analysis data
+  const results = currentAnalysis ? {
+    totalWells: currentAnalysis.total_wells,
+    platformHits: currentAnalysis.summary?.stage3_platform_hits || 0,
+    reporterHits: currentAnalysis.summary?.stage1_reporter_hits || 0,
+    vitalityHits: currentAnalysis.summary?.stage2_vitality_hits || 0,
+    platformHitRate: currentAnalysis.summary?.stage3_platform_hit_rate || 0,
+    reporterHitRate: currentAnalysis.summary?.stage1_reporter_hit_rate || 0,
+    vitalityHitRate: currentAnalysis.summary?.stage2_vitality_hit_rate || 0,
+    analysisType: currentAnalysis.analysis_type || 'multi-stage',
+    fileName: currentAnalysis.file_name || 'Demo Data'
+  } : null;
+
+  // Use config defaults for thresholds
+  const config = analysisDefaults || {
+    z_score_threshold: 2.0,
+    viability_gate: 0.3,
+    b_score_iterations: 5,
+    edge_effect_warning_threshold: 0.15
   };
 
   return (
@@ -18,40 +36,46 @@ const AnalysisDashboard = () => {
         <div className="text-center mb-16">
           <h2 className="text-4xl font-light tracking-tight mb-4">Analysis Dashboard</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Real-time analysis results with B-scoring, edge effect detection, and hit identification.
+            {results ? `Results from ${results.fileName}` : 'Run demo or upload data to see analysis results'}
           </p>
+          {isAnalyzing && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Analyzing...</span>
+            </div>
+          )}
         </div>
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light">{mockResults.totalWells}</div>
+              <div className="text-2xl font-light">{results?.totalWells || '—'}</div>
               <div className="text-sm text-muted-foreground">Total Wells</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light text-green-600">{mockResults.hits}</div>
-              <div className="text-sm text-muted-foreground">Hits Found</div>
+              <div className="text-2xl font-light text-green-600">{results?.platformHits || '—'}</div>
+              <div className="text-sm text-muted-foreground">Platform Hits</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light">{mockResults.hitRate}%</div>
-              <div className="text-sm text-muted-foreground">Hit Rate</div>
+              <div className="text-2xl font-light">{results ? `${(results.platformHitRate * 100).toFixed(1)}%` : '—'}</div>
+              <div className="text-sm text-muted-foreground">Platform Hit Rate</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light">{mockResults.plateCount}</div>
-              <div className="text-sm text-muted-foreground">Plates</div>
+              <div className="text-2xl font-light text-blue-600">{results?.reporterHits || '—'}</div>
+              <div className="text-sm text-muted-foreground">Reporter Hits</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light">{mockResults.processingTime}</div>
-              <div className="text-sm text-muted-foreground">Process Time</div>
+              <div className="text-2xl font-light text-purple-600">{results?.vitalityHits || '—'}</div>
+              <div className="text-sm text-muted-foreground">Vitality Hits</div>
             </CardContent>
           </Card>
         </div>
@@ -72,15 +96,15 @@ const AnalysisDashboard = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Z-Score Threshold:</span>
-                  <Badge variant="outline">±2.5</Badge>
+                  <Badge variant="outline">±{config.z_score_threshold}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Viability Gate:</span>
-                  <Badge variant="outline">0.3</Badge>
+                  <Badge variant="outline">{config.viability_gate}</Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">B-Score Iterations:</span>
-                  <Badge variant="outline">3</Badge>
+                  <Badge variant="outline">{config.b_score_iterations}</Badge>
                 </div>
                 <div className="pt-4 space-y-2">
                   <Button variant="outline" size="sm" className="w-full">
@@ -106,15 +130,21 @@ const AnalysisDashboard = () => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Edge Wells Detected:</span>
-                  <Badge variant="destructive">12</Badge>
+                  <Badge variant={results ? "destructive" : "outline"}>
+                    {results ? '—' : '—'}
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Correction Applied:</span>
-                  <Badge variant="secondary">Yes</Badge>
+                  <Badge variant="secondary">
+                    {config?.quality_control?.spatial_correction ? 'Yes' : 'No'}
+                  </Badge>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Warning Threshold:</span>
-                  <Badge variant="outline">15%</Badge>
+                  <Badge variant="outline">
+                    {(config.edge_effect_warning_threshold * 100).toFixed(0)}%
+                  </Badge>
                 </div>
                 <div className="pt-4 space-y-2">
                   <Button variant="outline" size="sm" className="w-full">

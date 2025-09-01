@@ -43,3 +43,11 @@ export function useDemoAnalysis() {
     mutationFn: ({ config }) => api.getDemoAnalysis(config),
   });
 }
+
+export function useAnalysisDefaults() {
+  return useQuery({
+    queryKey: ['analysisDefaults'],
+    queryFn: () => api.getAnalysisDefaults(),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+}
