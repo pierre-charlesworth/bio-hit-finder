@@ -22,9 +22,10 @@ import { api } from '@/lib/api';
 interface DataUploadBarProps {
   onStatusChange?: (status: 'none' | 'uploaded' | 'sample' | 'processing' | 'error') => void;
   onFileNameChange?: (fileName: string) => void;
+  onProcessCallbackChange?: (callback: (() => void) | null) => void;
 }
 
-const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps) => {
+const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChange }: DataUploadBarProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParametersExpanded, setIsParametersExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -55,6 +56,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps)
       setUploadedFile(file);
       onStatusChange?.('uploaded');
       onFileNameChange?.(file.name);
+      onProcessCallbackChange?.(() => handleProcessData);
     }
   };
 
@@ -66,6 +68,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps)
       setUploadedFile(file);
       onStatusChange?.('uploaded');
       onFileNameChange?.(file.name);
+      onProcessCallbackChange?.(() => handleProcessData);
     }
   };
 
@@ -99,9 +102,11 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps)
       setUploadedFile(null);
       onStatusChange?.('sample');
       onFileNameChange?.('');
+      onProcessCallbackChange?.(() => handleProcessData);
     } else {
       onStatusChange?.('none');
       onFileNameChange?.('');
+      onProcessCallbackChange?.(null);
     }
   };
 
@@ -170,20 +175,8 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange }: DataUploadBarProps)
             />
           </div>
 
-          {/* Right Side - Action Buttons */}
-          <div className="flex items-center gap-2">
-            {(uploadedFile || useSampleData) && (
-              <Button 
-                size="sm" 
-                className="gap-1"
-                onClick={handleProcessData}
-                disabled={uploadMutation.isPending}
-              >
-                <Play className="h-3 w-3" />
-                {uploadMutation.isPending ? 'Processing...' : 'Process'}
-              </Button>
-            )}
-            
+          {/* Right Side - Parameters Button */}
+          <div className="flex items-center">
             <Button 
               size="sm" 
               variant="outline" 

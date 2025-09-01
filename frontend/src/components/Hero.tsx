@@ -46,17 +46,9 @@ const Hero = () => {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center pt-24">
+    <section className="min-h-screen flex items-center justify-center pt-8">
       <div className="container-fluid max-w-7xl mx-auto text-center">
         <div className="max-w-4xl mx-auto">
-          {/* Connection Status */}
-          <div className="mb-8">
-            <Badge variant={isError ? "destructive" : isLoading ? "secondary" : "default"} className="mb-4">
-              <Circle className={`w-2 h-2 mr-2 ${isError ? 'fill-red-500' : isLoading ? 'fill-yellow-500' : 'fill-green-500'}`} />
-              {isError ? 'Backend Disconnected' : isLoading ? 'Connecting...' : 'Backend Connected'}
-            </Badge>
-          </div>
-
           <h1 className="text-fluid-3xl font-light tracking-tight text-reveal">
             BREAKthrough OM{' '}
             <span className="font-medium">Screening Platform</span>
