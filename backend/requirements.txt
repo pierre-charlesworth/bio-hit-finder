@@ -11,6 +11,10 @@ numpy>=1.24.0,<1.27.0
 
 # Phase 2.3: Add plotly (pure Python, no compilation needed)
 plotly>=5.17.0
-# scipy - large dependency (Phase 2.3)
-# openpyxl - file processing (Phase 2.4)
-# pyyaml - config loading (Phase 2.4)
+
+# Phase 3.1: Add scipy with Python 3.13 wheel support (available since 1.14.1)
+scipy>=1.14.1
+
+# Remaining Phase 3 dependencies:
+# openpyxl - file processing (Phase 3.2)
+# pyyaml - config loading (Phase 3.3)
