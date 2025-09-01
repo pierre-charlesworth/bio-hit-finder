@@ -66,7 +66,13 @@ const Header = ({
 
           {/* Center - Process Button */}
           <div className="flex items-center">
-            {canProcess && (
+            <div 
+              className={`transition-all duration-300 ease-in-out ${
+                canProcess 
+                  ? 'opacity-100 scale-100 translate-y-0' 
+                  : 'opacity-0 scale-95 translate-y-1 pointer-events-none'
+              }`}
+            >
               <Button 
                 size="sm" 
                 className="gap-1"
@@ -76,7 +82,7 @@ const Header = ({
                 <Play className="h-3 w-3" />
                 {isProcessing ? 'Processing...' : 'Process'}
               </Button>
-            )}
+            </div>
           </div>
 
           {/* Right Side - Navigation */}
