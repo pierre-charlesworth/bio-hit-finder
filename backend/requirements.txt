@@ -1,13 +1,14 @@
-# Ultra-minimal FastAPI setup for Render deployment
+# Phase 2: Adding data processing dependencies incrementally
 fastapi==0.100.0
 uvicorn==0.23.0
 python-multipart==0.0.6
 
-# Temporarily removed for initial deployment:
-# pydantic - causing compilation issues, using FastAPI's built-in
-# pandas - causing Python 3.13 compilation issues
-# numpy - dependency of pandas  
-# plotly - can be added back later
-# scipy - large dependency
-# openpyxl - file processing (Phase 2)
-# pyyaml - config loading (Phase 2)
+# Phase 2.1: Add pandas with known good wheels for Python 3.13
+pandas>=2.1.0,<2.2.0
+
+# Temporarily removed for later phases:
+# numpy - dependency of pandas, will be added next
+# plotly - pure Python, will be added after numpy
+# scipy - large dependency (Phase 2.3)
+# openpyxl - file processing (Phase 2.4)
+# pyyaml - config loading (Phase 2.4)
