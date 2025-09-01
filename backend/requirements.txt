@@ -3,29 +3,25 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
-# Existing dependencies from Streamlit app
-pandas==2.1.4
-numpy==1.24.4
-plotly==5.17.0
-scipy==1.11.4
-openpyxl==3.1.2
-polars==0.20.2
-pyyaml==6.0.1
+# Core data processing (Python 3.11 compatible)
+pandas>=2.0.0,<2.2.0
+numpy>=1.24.0,<1.26.0
+plotly>=5.17.0
+scipy>=1.11.0,<1.12.0
+openpyxl>=3.1.0
+pyyaml>=6.0.0
 
-# Export functionality
-weasyprint==60.2
+# Polars (optional, for performance)
+polars>=0.20.0; python_version >= "3.8"
+
+# Export functionality (simplified for now)
+# weasyprint==60.2  # Temporarily disabled - complex build
 
 # Additional FastAPI dependencies
-pydantic==2.5.0
-python-jose==3.3.0
-passlib==1.7.4
+pydantic>=2.5.0
+python-jose>=3.3.0
+passlib>=1.7.4
 
 # Background processing (for future use)
-celery==5.3.4
-redis==5.0.1
-
-# Development tools
-pytest==7.4.3
-pytest-asyncio==0.21.1
-black==23.11.0
-isort==5.12.0
+# celery==5.3.4     # Temporarily disabled
+# redis==5.0.1      # Temporarily disabled
