@@ -58,7 +58,7 @@ const DataUploadBar = () => {
   };
 
   return (
-    <div className="border-b bg-background/80 backdrop-blur-sm border-border">
+    <div className="fixed top-[73px] left-0 right-0 z-40 border-b bg-background/80 backdrop-blur-sm border-border">
       <div className="container-fluid max-w-7xl mx-auto">
         <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
           {/* Collapsed Bar */}

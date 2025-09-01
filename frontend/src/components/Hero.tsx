@@ -46,7 +46,7 @@ const Hero = () => {
   };
 
   return (
-    <section className="min-h-screen flex items-center justify-center pt-16">
+    <section className="min-h-screen flex items-center justify-center pt-32">
       <div className="container-fluid max-w-7xl mx-auto text-center">
         <div className="max-w-4xl mx-auto">
           {/* Connection Status */}
