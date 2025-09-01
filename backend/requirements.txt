@@ -6,9 +6,11 @@ python-multipart==0.0.6
 # Phase 2.1: Add pandas with Python 3.13 wheel support (cp313)
 pandas==2.2.3
 
+# Phase 2.2: Add numpy explicitly (pandas dependency, but explicit version)
+numpy>=1.24.0,<1.27.0
+
 # Temporarily removed for later phases:
-# numpy - dependency of pandas, will be added next
-# plotly - pure Python, will be added after numpy
+# plotly - pure Python, will be added next
 # scipy - large dependency (Phase 2.3)
 # openpyxl - file processing (Phase 2.4)
 # pyyaml - config loading (Phase 2.4)
