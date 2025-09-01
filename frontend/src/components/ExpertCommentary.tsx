@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Quote, Star, Users, Building2 } from 'lucide-react';
+import { Quote, Star, Users, Building2, Award } from 'lucide-react';
 
 const ExpertCommentary = () => {
   const testimonials = [
