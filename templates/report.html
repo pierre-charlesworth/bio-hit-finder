@@ -316,31 +316,46 @@
     <!-- Methodology Section -->
     {% if config.export.pdf.include_methodology %}
     <div class="page-break">
-        <h2>Processing Methodology</h2>
+        <h2>Scientific Methodology</h2>
         
         <div class="methodology">
-            <h3>Overview</h3>
-            <p>{{ methodology.overview }}</p>
+            <h3>BREAKthrough Platform Overview</h3>
+            <p>{{ methodology.platform_overview }}</p>
         </div>
         
         <div class="methodology">
-            <h3>Data Normalization</h3>
-            <p>{{ methodology.normalization }}</p>
+            <h3>Biological Foundation</h3>
+            <p>{{ methodology.biological_foundation }}</p>
         </div>
         
         <div class="methodology">
-            <h3>Statistical Analysis</h3>
-            <p>{{ methodology.zscore_calculation }}</p>
+            <h3>Normalization Methodology</h3>
+            <p>{{ methodology.normalization_methodology }}</p>
         </div>
         
         <div class="methodology">
-            <h3>Quality Control</h3>
-            <p>{{ methodology.quality_control }}</p>
+            <h3>Robust Statistical Foundations</h3>
+            <p>{{ methodology.robust_statistical_foundations }}</p>
         </div>
         
         <div class="methodology">
-            <h3>Viability Assessment</h3>
-            <p>{{ methodology.viability_gating }}</p>
+            <h3>Viability Gating Rationale</h3>
+            <p>{{ methodology.viability_gating_rationale }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Quality Control Framework</h3>
+            <p>{{ methodology.quality_control_framework }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Hit Classification System</h3>
+            <p>{{ methodology.hit_classification_system }}</p>
+        </div>
+        
+        <div class="methodology">
+            <h3>Technical Implementation</h3>
+            <p>{{ methodology.technical_implementation }}</p>
         </div>
     </div>
     {% endif %}
