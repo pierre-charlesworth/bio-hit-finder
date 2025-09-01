@@ -462,6 +462,119 @@ class ScatterPlotTemplate(BaseTemplate):
         }
 
 
+class BarChartTemplate(BaseTemplate):
+    """Template for bar chart legends."""
+    
+    def __init__(self):
+        super().__init__(ChartType.BAR_CHART)
+    
+    def generate_biological_context(self, metadata: LegendMetadata) -> Dict[ExpertiseLevel, str]:
+        """Generate biological context for bar charts."""
+        n_plates = metadata.statistical_context.sample_size // 384  # Approximate plate count
+        bio_ctx = metadata.biological_context
+        
+        basic = (
+            f"Bar chart showing biological responses across screening plates. "
+            f"Each bar represents different conditions or samples tested."
+        )
+        
+        intermediate = (
+            f"Bar chart comparison of {bio_ctx.biological_process} responses across {n_plates} screening plates. "
+            f"The {bio_ctx.assay_type} platform measures viability and stress response patterns "
+            f"using dual reporter systems to identify outer membrane permeabilizers."
+        )
+        
+        expert = (
+            f"Comparative analysis of {bio_ctx.biological_process} activation across {n_plates} screening plates "
+            f"using {', '.join(bio_ctx.reporter_systems)} reporters. The {bio_ctx.assay_type} platform "
+            f"evaluates compound selectivity profiles through {', '.join(bio_ctx.stress_pathways)} pathway monitoring, "
+            f"enabling identification of selective outer membrane permeabilizers with therapeutic potential."
+        )
+        
+        return {
+            ExpertiseLevel.BASIC: basic,
+            ExpertiseLevel.INTERMEDIATE: intermediate,
+            ExpertiseLevel.EXPERT: expert
+        }
+    
+    def generate_statistical_methods(self, metadata: LegendMetadata) -> Dict[ExpertiseLevel, str]:
+        """Generate statistical methods explanation for bar charts."""
+        method = metadata.statistical_context.method_used
+        
+        basic = (
+            f"Bar heights show aggregated data values for comparison between conditions."
+        )
+        
+        intermediate = (
+            f"Bar heights represent aggregated data using {method} normalization. "
+            f"Values calculated using robust statistics resistant to outliers."
+        )
+        
+        expert = (
+            f"Bar heights represent aggregated data using {method} normalization. "
+            f"Values calculated as (value - median) / (1.4826 × MAD) where MAD is "
+            f"the median absolute deviation, providing robust statistics resistant to outliers. "
+            f"Error bars represent standard error of the mean across biological replicates."
+        )
+        
+        return {
+            ExpertiseLevel.BASIC: basic,
+            ExpertiseLevel.INTERMEDIATE: intermediate,
+            ExpertiseLevel.EXPERT: expert
+        }
+    
+    def generate_interpretation_guide(self, metadata: LegendMetadata) -> Dict[ExpertiseLevel, str]:
+        """Generate interpretation guide for bar charts."""
+        basic = (
+            "Compare bar heights to identify differences between conditions. "
+            "Higher bars indicate stronger responses."
+        )
+        
+        intermediate = (
+            "Compare bar heights to identify patterns across conditions or plates. "
+            "Higher bars indicate stronger biological responses or greater compound activity. "
+            "Look for consistent patterns that suggest reproducible biological effects."
+        )
+        
+        expert = (
+            "Comparative bar analysis reveals systematic biological responses, technical artifacts, "
+            "and compound-specific effects. Statistical significance can be assessed through "
+            "error bar overlap analysis and formal statistical tests. Bar height differences "
+            ">2-fold typically indicate biologically relevant antimicrobial activity patterns."
+        )
+        
+        return {
+            ExpertiseLevel.BASIC: basic,
+            ExpertiseLevel.INTERMEDIATE: intermediate,
+            ExpertiseLevel.EXPERT: expert
+        }
+    
+    def get_chart_specific_content(self) -> Dict[ExpertiseLevel, str]:
+        """Get bar chart specific content by expertise level."""
+        basic = (
+            "Bar charts show comparisons between different groups or conditions."
+        )
+        
+        intermediate = (
+            "Bar charts facilitate comparative analysis of screening results across "
+            "multiple plates or conditions, revealing systematic differences and trends "
+            "in biological responses."
+        )
+        
+        expert = (
+            "Comparative bar chart analysis enables identification of systematic "
+            "biological responses, technical artifacts, and compound-specific effects. "
+            "Statistical comparison of bar heights can reveal significant differences "
+            "in antimicrobial activity patterns across experimental conditions."
+        )
+        
+        return {
+            ExpertiseLevel.BASIC: basic,
+            ExpertiseLevel.INTERMEDIATE: intermediate,
+            ExpertiseLevel.EXPERT: expert
+        }
+
+
 class TemplateRegistry:
     """Registry for managing chart-specific templates."""
     
@@ -471,6 +584,7 @@ class TemplateRegistry:
             ChartType.HEATMAP: HeatmapTemplate(),
             ChartType.HISTOGRAM: HistogramTemplate(),
             ChartType.SCATTER_PLOT: ScatterPlotTemplate(),
+            ChartType.BAR_CHART: BarChartTemplate(),
             # Add more templates as needed
         }
         

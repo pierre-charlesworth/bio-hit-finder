@@ -30,6 +30,10 @@ from sample_data_generator import create_demo_data
 # Import advanced visualization modules
 from visualizations.advanced.qc_dashboard import QCDashboard
 
+# Import figure legend system
+from visualizations.legends.models import ChartType, ExpertiseLevel
+from visualizations.legends.integration import StreamlitIntegration, VisualizationIntegrator
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -881,35 +885,218 @@ def main() -> None:
         # Methodology and Scientific Background
         st.divider()
         with st.expander("🧬 Scientific Methodology", expanded=False):
-            st.markdown("""
-            **BREAKthrough Dual-Readout Screening Platform**
+            # Create tabs within the expander for better organization
+            method_tab1, method_tab2, method_tab3, method_tab4 = st.tabs([
+                "🔬 Biological Rationale", "📊 Statistical Methods", "⚡ Assay Design", "🧮 Quality Control"
+            ])
             
-            This platform implements a dual-reporter system for identifying compounds that disrupt the Gram-negative outer membrane (OM):
+            with method_tab1:
+                st.markdown("""
+                **BREAKthrough Dual-Readout Screening Platform**
+                
+                ### Reporter Ratio Analysis: Why BG/BT Instead of Raw Fluorescence
+                
+                **β-galactosidase/ATP Ratios (BG/BT) normalize for:**
+                • **Cell density variations**: ATP levels reflect viable cell mass, correcting for growth differences
+                • **Compound cytotoxicity**: Separates transcriptional activation from cell death artifacts
+                • **Plate-to-plate variability**: Internal normalization reduces systematic errors
+                • **Well-to-well variations**: Each well serves as its own internal control
+                
+                **Biological significance:**
+                - **BG signal**: Transcriptional response to membrane stress (lacZ reporter)
+                - **BT signal**: Cell viability via ATP measurement (BacTiter-Glo)
+                - **Ratio interpretation**: Fold-change in gene expression per viable cell
+                
+                ### lptA and ldtD Reporters: Sentinel Systems for OM Disruption
+                
+                **lptA (LPS transport protein A):**
+                • **σE envelope stress response**: Activated by misfolded outer membrane proteins
+                • **LPS biogenesis pathway**: Essential for lipopolysaccharide transport to outer membrane
+                • **Stress specificity**: Responds to OM integrity loss, LPS defects, protein misfolding
+                • **Biological relevance**: LPS is critical for Gram-negative OM barrier function
+                
+                **ldtD (L,D-transpeptidase D):**
+                • **Cpx envelope stress response**: Activated by peptidoglycan and OM perturbations
+                • **Cell wall remodeling**: Compensatory response to structural damage
+                • **Stress integration**: Detects combined OM/peptidoglycan disruption
+                • **Physiological role**: Maintains cell envelope integrity under stress
+                
+                **Dual-reporter advantage:**
+                - **Orthogonal detection**: Two independent stress pathways increase hit confidence
+                - **Mechanism discrimination**: lptA (LPS-specific) vs ldtD (structural compensation)
+                - **Reduced false positives**: Compounds affecting both reporters likely target OM
+                
+                ### Three-Strain Vitality Screen: Selectivity Profiling
+                
+                **E. coli WT (wild-type):**
+                • **Intact outer membrane**: Full OM barrier function
+                • **Natural resistance**: Protected against OM-targeting compounds
+                • **Expected response**: Minimal growth inhibition from OM disruptors
+                
+                **E. coli ΔtolC (efflux-deficient):**
+                • **Compromised OM**: Reduced efflux capacity, increased permeability
+                • **Hypersensitivity**: Enhanced susceptibility to OM-targeting agents
+                • **Phenotypic amplification**: OM defects sensitize to further disruption
+                
+                **S. aureus (Gram-positive control):**
+                • **No outer membrane**: Only cytoplasmic membrane and thick peptidoglycan
+                • **Selectivity control**: Should resist OM-specific compounds
+                • **Cross-reactivity check**: Identifies broad-spectrum cytotoxins
+                
+                **Selectivity pattern for OM disruptors:**
+                - **Ideal profile**: WT resistant, ΔtolC sensitive, S. aureus resistant
+                - **Interpretation**: Selective OM targeting without general cytotoxicity
+                """)
             
-            **🔬 Reporter System:**
-            • **lptA**: σE-regulated LPS transport protein - detects LPS biogenesis stress
-            • **ldtD**: Cpx-regulated L,D-transpeptidase - detects peptidoglycan remodeling
+            with method_tab2:
+                st.markdown("""
+                ### Robust Statistics: Why Median/MAD Over Mean/SD
+                
+                **Screening data characteristics:**
+                • **Heavy-tailed distributions**: Most wells inactive, few strong hits
+                • **Outlier contamination**: 1-5% true hits appear as extreme values
+                • **Plate artifacts**: Edge effects, pipetting errors, contamination
+                • **Non-normal distributions**: Biological responses often skewed
+                
+                **Robust Z-score advantages:**
+                • **Outlier resistance**: Up to 50% contamination tolerance vs 0% for mean/SD
+                • **Stable estimates**: Median/MAD unaffected by extreme hit compounds
+                • **Better sensitivity**: True hits stand out more clearly from background
+                • **Reproducible thresholds**: Z ≥ 2.0 maintains consistent significance across plates
+                
+                **Mathematical foundation:**
+                ```
+                Robust Z = (value - median) / (1.4826 × MAD)
+                ```
+                - **1.4826**: Consistency factor for normal distribution equivalence
+                - **MAD**: Median Absolute Deviation = median(|X - median(X)|)
+                - **Interpretation**: Standard deviations above median for normal data
+                
+                ### B-score Correction: Eliminating Systematic Bias
+                
+                **Row/column effects in high-density plates:**
+                • **Pipetting gradients**: Systematic volume variations across rows/columns
+                • **Temperature gradients**: Incubator edge effects, thermal cycling
+                • **Evaporation patterns**: Edge wells lose volume, concentrate compounds
+                • **Handling artifacts**: Plate manipulation, robot positioning errors
+                
+                **Median-polish algorithm:**
+                1. **Row correction**: Subtract row medians from each well
+                2. **Column correction**: Subtract column medians from corrected values
+                3. **Iteration**: Repeat until convergence (typically 2-3 cycles)
+                4. **Robust scaling**: Apply MAD-based Z-scoring to residuals
+                
+                **When to apply B-scoring:**
+                - **Strong row/column patterns**: Visible in heatmaps as systematic bands
+                - **Edge effects present**: Spatial artifacts detected by QC algorithms
+                - **Large plate formats**: 384/1536-well plates more susceptible
+                - **Multiple plate comparisons**: Harmonizes data across plates
+                
+                ### ATP-Based Viability Gating: Biological Relevance
+                
+                **Why ATP as viability marker:**
+                • **Cellular energy**: ATP levels directly reflect metabolic activity
+                • **Rapid response**: Drops quickly upon cell death or severe stress
+                • **Quantitative**: Linear relationship with viable cell number
+                • **Stability**: More stable than other viability markers (dyes, enzymes)
+                
+                **Viability threshold (f = 0.3):**
+                • **Empirical optimization**: Balance between sensitivity and specificity
+                • **Biological rationale**: 30% of median ATP indicates compromised viability
+                • **Quality filter**: Excludes wells with insufficient cells for reliable measurement
+                • **False positive reduction**: Prevents artifacts from dying/dead cells
+                """)
             
-            **⚡ Three-Strain Vitality Screen:**
-            • **E. coli WT**: Intact OM (resistant to OM disruptors)
-            • **E. coli ΔtolC**: Compromised OM (sensitive to OM disruptors) 
-            • **S. aureus**: Gram-positive control (no OM target)
+            with method_tab3:
+                st.markdown("""
+                ### OD Measurements: Growth and Compound Effects
+                
+                **Optical density (OD600) significance:**
+                • **Bacterial density**: Direct measure of cell number/biomass
+                • **Growth inhibition**: Reduced OD indicates bacteriostatic/bactericidal effects
+                • **Compound cytotoxicity**: General toxicity assessment across strains
+                • **Time-dependent**: Reflects cumulative growth over assay period
+                
+                **Plate-relative normalization:**
+                ```
+                OD_normalized = OD_well / median(OD_plate)
+                ```
+                **Rationale:**
+                - **Internal standardization**: Each plate serves as its own reference
+                - **Batch effects**: Corrects for media, inoculum, incubation variations
+                - **Interpretability**: Values > 1.0 indicate above-average growth
+                - **Threshold setting**: Consistent cutoffs across experiments
+                
+                ### High-Throughput Screening Considerations
+                
+                **384-well plate format:**
+                • **Miniaturization**: 10-50 μL working volumes
+                • **Evaporation sensitivity**: Edge wells more susceptible to volume loss
+                • **Heat transfer**: Non-uniform temperature distribution
+                • **Optical effects**: Well-to-well crosstalk, meniscus artifacts
+                
+                **1536-well plate format:**
+                • **Ultra-miniaturization**: 2-5 μL working volumes
+                • **Extreme edge effects**: Pronounced evaporation gradients
+                • **Spatial resolution**: Fine-scale systematic patterns
+                • **Quality control**: More stringent requirements for acceptable data
+                """)
             
-            **📊 Statistical Analysis:**
-            • Robust Z-scores using MAD (outlier-resistant)
-            • Viability gating with ATP-based luminescence
-            • Multi-stage hit calling pipeline
+            with method_tab4:
+                st.markdown("""
+                ### Edge Effect Detection: Spatial Quality Control
+                
+                **Common edge effect patterns:**
+                • **Peripheral enhancement**: Higher signals at plate edges
+                • **Corner artifacts**: Extreme values in plate corners
+                • **Linear gradients**: Systematic trends across rows/columns
+                • **Quadrant bias**: Differential responses in plate sections
+                
+                **Detection algorithms:**
+                • **Border analysis**: Compare edge vs. interior well distributions
+                • **Spatial correlation**: Identify systematic position-dependent patterns
+                • **Statistical tests**: Quantify significance of spatial effects
+                • **Visualization**: Heatmaps reveal pattern structure
+                
+                **Impact on data quality:**
+                • **False hits**: Spatial artifacts mistaken for biological activity
+                • **Reduced power**: Systematic bias decreases signal-to-noise ratio
+                • **Irreproducibility**: Position-dependent effects vary between experiments
+                • **Interpretation errors**: Biological conclusions confounded by technical artifacts
+                
+                ### Quality Control Metrics
+                
+                **Z' factor assessment:**
+                ```
+                Z' = 1 - (3 × (SD_pos + SD_neg) / |mean_pos - mean_neg|)
+                ```
+                • **Assay quality**: Z' > 0.5 excellent, 0.0-0.5 acceptable, < 0.0 poor
+                • **Hit detection power**: Higher Z' enables reliable hit identification
+                • **Control separation**: Measures positive vs. negative control discrimination
+                
+                **Coefficient of variation (CV):**
+                • **Precision measure**: SD/mean × 100% for replicate controls
+                • **Acceptable range**: CV < 20% for biological assays
+                • **Plate quality**: High CV indicates technical problems
+                
+                **Signal-to-background ratio:**
+                • **Dynamic range**: Positive signal / background noise
+                • **Sensitivity**: Higher ratios enable detection of weaker effects
+                • **Assay optimization**: Guides protocol refinement
+                
+                ---
+                
+                **📚 Key Publications:**
+                • Silhavy et al. (2010) *Cold Spring Harb Perspect Biol* - OM biology
+                • Yoon & Song (2024) *J Microbiol* - LPS transport mechanisms
+                • Chan et al. (2021) *ACS Infect Dis* - OM screening approaches
+                • Zhang et al. (1999) *J Biomol Screen* - Z' factor methodology
+                • Brideau et al. (2003) *J Biomol Screen* - B-score correction
+                
+                **🏆 BREAKthrough Project**
+                *Funded by the European Union - Horizon Europe Programme*
+                """)
             
-            **📚 Learn More:**
-            • [Scientific Background](docs/user_guide/scientific_background.md)
-            • **Key Publications:**
-              - Silhavy et al. (2010) *Cold Spring Harb Perspect Biol*
-              - Yoon & Song (2024) *J Microbiol* 
-              - Chan et al. (2021) *ACS Infect Dis*
-            
-            **🏆 BREAKthrough Project**
-            *Funded by the European Union*
-            """)
         
         
         # Process files when button is clicked
@@ -1212,36 +1399,175 @@ def main() -> None:
             
             # Results interpretation guide
             with st.expander("🧬 Results Interpretation Guide", expanded=False):
-                st.markdown("""
-                **Understanding Your Screening Results**
+                # Create interpretation tabs for better organization
+                interp_tab1, interp_tab2, interp_tab3 = st.tabs([
+                    "🎯 Hit Classification", "📊 Data Quality", "⚠️ Troubleshooting"
+                ])
                 
-                **🔬 Reporter Hits (Stage 1):**
-                • **High lptA Z-scores** → LPS transport stress, OM integrity compromised
-                • **High ldtD Z-scores** → Peptidoglycan remodeling, structural compensation
-                • **Both reporters** → Dual evidence of OM disruption (strongest signal)
+                with interp_tab1:
+                    st.markdown("""
+                    **Understanding Your Screening Results**
+                    
+                    ### 🔬 Reporter Hits (Stage 1): Biological Response
+                    
+                    **High lptA Z-scores (≥ 2.0):**
+                    • **Mechanistic interpretation**: σE stress response activation
+                    • **Biological meaning**: LPS transport disruption, OM protein misfolding
+                    • **Pathway specificity**: Outer membrane biogenesis stress
+                    • **Clinical relevance**: Targets essential OM assembly machinery
+                    
+                    **High ldtD Z-scores (≥ 2.0):**
+                    • **Mechanistic interpretation**: Cpx envelope stress activation
+                    • **Biological meaning**: Peptidoglycan remodeling, structural compensation
+                    • **Cellular response**: Adaptive mechanism to maintain envelope integrity
+                    • **Indicator function**: Detects combined OM/peptidoglycan perturbation
+                    
+                    **Dual-positive reporters (lptA+ and ldtD+):**
+                    • **Highest confidence**: Orthogonal evidence of OM disruption
+                    • **Synergistic stress**: Multiple envelope systems activated simultaneously
+                    • **Priority hits**: Most likely to have genuine OM-targeting activity
+                    • **Mechanism diversity**: May affect multiple envelope pathways
+                    
+                    ### ⚡ Vitality Hits (Stage 2): Selectivity Profiling
+                    
+                    **Ideal selectivity pattern (WT > 80%, ΔtolC ≤ 80%, SA > 80%):**
+                    • **WT resistance**: Intact OM provides natural protection
+                    • **ΔtolC sensitivity**: Compromised efflux enhances compound accumulation
+                    • **S. aureus tolerance**: Lack of OM target confers resistance
+                    • **Therapeutic relevance**: Selective targeting minimizes host toxicity
+                    
+                    **Alternative patterns and interpretations:**
+                    • **All strains sensitive**: Broad-spectrum cytotoxin (deprioritize)
+                    • **Only WT affected**: Unusual, may target WT-specific pathways
+                    • **Variable S. aureus**: May have secondary Gram-positive targets
+                    • **Dose-dependent**: Different patterns at varying concentrations
+                    
+                    ### 🎯 Platform Hits (Stage 3): High-Confidence Candidates
+                    
+                    **Integration of biological and phenotypic evidence:**
+                    • **Mechanistic plausibility**: Reporter activation consistent with OM targeting
+                    • **Selectivity confirmation**: Differential strain susceptibility pattern
+                    • **Statistical significance**: Robust scoring across multiple metrics
+                    • **Quality control**: Passes viability gating and spatial artifact checks
+                    
+                    **Therapeutic potential:**
+                    • **Antibiotic adjuvants**: Enhance existing drug efficacy
+                    • **Combination therapy**: Synergize with conventional antibiotics
+                    • **Resistance circumvention**: Overcome OM-mediated resistance
+                    • **Novel mechanisms**: Alternative to traditional antimicrobial targets
+                    
+                    **Expected outcomes:**
+                    • **Hit rate**: ~1% of screened compounds (library-dependent)
+                    • **Validation success**: 10-30% confirm in secondary assays
+                    • **Lead compounds**: 1-5% advance to optimization
+                    • **Clinical candidates**: <1% reach preclinical development
+                    """)
                 
-                **⚡ Vitality Hits (Stage 2):**
-                • **WT > 80%, ΔtolC ≤ 80%, SA > 80%** → OM-selective activity pattern
-                • **Selective toxicity** → Targets OM specifically, not general cytotoxicity
-                • **Gram-positive resistance** → Confirms OM as the target
+                with interp_tab2:
+                    st.markdown("""
+                    ### 📊 Statistical Quality Indicators
+                    
+                    **Z-score interpretation:**
+                    • **Z ≥ 3.0**: Strong hits, high confidence (>99.7% significance)
+                    • **Z 2.0-3.0**: Moderate hits, good confidence (95-99.7% significance)
+                    • **Z 1.5-2.0**: Weak hits, consider with caution (87-95% significance)
+                    • **Z < 1.5**: Below detection threshold, likely inactive
+                    
+                    **B-score vs. Raw Z-score comparison:**
+                    • **Concordant hits**: Both methods agree → High confidence
+                    • **B-score exclusive**: May be artifacts corrected by spatial adjustment
+                    • **Raw Z exclusive**: May be systematic bias amplified by B-scoring
+                    • **Magnitude differences**: B-scoring can enhance or diminish signals
+                    
+                    **Viability gating impact:**
+                    • **ATP-filtered hits**: Focus on viable cellular responses
+                    • **Below threshold**: May indicate cytotoxicity or assay failure
+                    • **Borderline viability**: Interpret with caution, may be stress-induced
+                    • **Viability recovery**: Some compounds may allow adaptation
+                    
+                    ### 🗺️ Spatial Pattern Recognition
+                    
+                    **Legitimate biological patterns:**
+                    • **Random distribution**: Expected for genuine bioactive compounds
+                    • **Clustered hits**: May indicate structural similarity or concentration gradients
+                    • **Isolated signals**: Single well hits require confirmation
+                    • **Replicate consistency**: Activity reproducible across plate replicates
+                    
+                    **Technical artifacts to avoid:**
+                    • **Edge enhancement**: Systematic elevation at plate periphery
+                    • **Row/column streaks**: Linear patterns suggesting systematic bias
+                    • **Corner effects**: Extreme values in plate corners
+                    • **Gradient patterns**: Smooth transitions suggesting technical variation
+                    
+                    ### 📈 Multi-Plate Analysis
+                    
+                    **Cross-plate validation:**
+                    • **Reproducible hits**: Active across multiple plates/experiments
+                    • **Plate-specific artifacts**: Activity limited to single plates
+                    • **Concentration-response**: Consistent potency across dose ranges
+                    • **Batch effects**: Account for reagent/media lot variations
+                    """)
                 
-                **🎯 Platform Hits (Stage 3):**
-                • **Biological + phenotypic evidence** → High-confidence OM permeabilizers
-                • **Adjuvant candidates** → Can sensitize bacteria to existing antibiotics
-                • **Expected hit rate: ~1%** → Rare, valuable compounds for combination therapy
+                with interp_tab3:
+                    st.markdown("""
+                    ### ⚠️ Common Issues and Troubleshooting
+                    
+                    **Low hit rates (<0.1%):**
+                    • **Library composition**: May lack bioactive compounds
+                    • **Assay sensitivity**: Thresholds too stringent
+                    • **Screening conditions**: Suboptimal compound concentrations
+                    • **Reporter system**: Check positive controls and strain viability
+                    
+                    **Excessive hit rates (>5%):**
+                    • **Systematic bias**: Check for edge effects or pipetting errors
+                    • **Contamination**: Bacterial, chemical, or cross-well contamination
+                    • **Assay artifacts**: Non-specific compound interactions
+                    • **Threshold adjustment**: Consider more stringent cutoffs
+                    
+                    **Inconsistent selectivity patterns:**
+                    • **Strain viability**: Verify all strains grow comparably
+                    • **OM integrity**: Confirm ΔtolC strain phenotype
+                    • **Growth conditions**: Optimize media and incubation parameters
+                    • **Compound stability**: Check for degradation or precipitation
+                    
+                    **Edge effects dominating results:**
+                    • **Plate handling**: Review pipetting and incubation protocols
+                    • **Environmental control**: Minimize temperature/humidity gradients
+                    • **Plate sealing**: Prevent evaporation and contamination
+                    • **B-score correction**: Apply spatial bias correction methods
+                    
+                    **Viability issues:**
+                    • **Low ATP signals**: Check bacterial growth conditions
+                    • **Reagent quality**: Verify BacTiter-Glo performance
+                    • **Incubation timing**: Optimize assay duration
+                    • **Threshold adjustment**: May need library-specific optimization
+                    
+                    ### 🔄 Follow-up Studies
+                    
+                    **Secondary assays for hit validation:**
+                    • **Dose-response curves**: Confirm concentration-dependent activity
+                    • **Time-course studies**: Assess kinetics of reporter activation
+                    • **Mechanism-of-action**: Additional envelope stress markers
+                    • **Synergy testing**: Combination with known antibiotics
+                    
+                    **Orthogonal validation methods:**
+                    • **Live/dead staining**: Direct viability assessment
+                    • **OM permeability**: Fluorescent probe uptake assays
+                    • **Electron microscopy**: Morphological changes
+                    • **Proteomics**: Global stress response analysis
+                    
+                    ### 📋 Quality Control Checklist
+                    
+                    **Before concluding analysis:**
+                    - ✅ Check positive/negative controls
+                    - ✅ Verify edge effect warnings
+                    - ✅ Review spatial heatmaps for artifacts
+                    - ✅ Confirm viability gating appropriateness
+                    - ✅ Compare B-score vs. raw Z-score results
+                    - ✅ Assess hit distribution across plates
+                    - ✅ Validate selectivity patterns make biological sense
+                    """)
                 
-                **📊 Quality Indicators:**
-                • **Z-scores ≥ 2.0** → Statistically significant above background noise
-                • **Viability gating** → Excludes low-ATP artifacts, focuses on viable responses  
-                • **Edge effects** → Spatial artifacts that may confound results
-                • **B-scores** → Corrected for systematic row/column bias when applied
-                
-                **🚨 Interpretation Caveats:**
-                • **False positives:** Some hits may be assay artifacts or non-specific effects
-                • **Dose-response needed:** Confirm activity across concentration ranges
-                • **Mechanism validation:** Additional assays required to confirm OM disruption
-                • **Cytotoxicity assessment:** Ensure selectivity vs mammalian cells
-                """)
             
             # Download buttons
             st.subheader("Downloads")
@@ -1676,6 +2002,24 @@ def main() -> None:
         st.header("Visualizations")
         
         if df is not None and len(df) > 0:
+            # Legend expertise level selector
+            expertise_col1, expertise_col2 = st.columns([1, 3])
+            with expertise_col1:
+                legend_expertise = st.selectbox(
+                    "📖 Legend Detail Level",
+                    ["Basic", "Intermediate", "Expert"],
+                    index=1,  # Default to Intermediate
+                    help="Choose the level of detail for figure legends"
+                )
+                expertise_level = ExpertiseLevel(legend_expertise.lower())
+            
+            with expertise_col2:
+                st.info("💡 **Legends have been added below each figure** to provide scientific context and interpretation guidance based on your selected detail level.")
+            
+            # Initialize legend integration
+            integrator = VisualizationIntegrator()
+            st_integration = StreamlitIntegration(integrator)
+            
             # Create 2x2 grid
             viz_col1, viz_col2 = st.columns(2)
             
@@ -1693,6 +2037,17 @@ def main() -> None:
                     fig1.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
                     fig1.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
                     st.plotly_chart(fig1, use_container_width=True)
+                    
+                    # Add scientific legend
+                    legend = integrator.legend_manager.create_legend(
+                        data=df,
+                        chart_type=ChartType.HISTOGRAM,
+                        expertise_level=expertise_level
+                    )
+                    
+                    with st.expander("📖 Z_lptA Distribution Legend", expanded=False):
+                        content = st_integration.formatter.create_expandable_legend(legend)
+                        st.markdown(content)
                 else:
                     st.warning("Z_lptA column not available")
             
@@ -1710,6 +2065,17 @@ def main() -> None:
                     fig2.add_vline(x=z_cutoff, line_dash="dash", line_color="red", annotation_text=f"Threshold: {z_cutoff}")
                     fig2.add_vline(x=-z_cutoff, line_dash="dash", line_color="red")
                     st.plotly_chart(fig2, use_container_width=True)
+                    
+                    # Add scientific legend
+                    legend = integrator.legend_manager.create_legend(
+                        data=df,
+                        chart_type=ChartType.HISTOGRAM,
+                        expertise_level=expertise_level
+                    )
+                    
+                    with st.expander("📖 Z_ldtD Distribution Legend", expanded=False):
+                        content = st_integration.formatter.create_expandable_legend(legend)
+                        st.markdown(content)
                 else:
                     st.warning("Z_ldtD column not available")
             
@@ -1729,6 +2095,17 @@ def main() -> None:
                         hover_data=['Well'] if 'Well' in df.columns else None
                     )
                     st.plotly_chart(fig3, use_container_width=True)
+                    
+                    # Add scientific legend
+                    legend = integrator.legend_manager.create_legend(
+                        data=df,
+                        chart_type=ChartType.SCATTER_PLOT,
+                        expertise_level=expertise_level
+                    )
+                    
+                    with st.expander("📖 Ratio Correlation Legend", expanded=False):
+                        content = st_integration.formatter.create_expandable_legend(legend)
+                        st.markdown(content)
                 else:
                     st.warning("Required ratio columns not available")
             
@@ -1768,6 +2145,17 @@ def main() -> None:
                     )
                     fig4.update_layout(showlegend=True)
                     st.plotly_chart(fig4, use_container_width=True)
+                    
+                    # Add scientific legend
+                    legend = integrator.legend_manager.create_legend(
+                        data=df,
+                        chart_type=ChartType.BAR_CHART,
+                        expertise_level=expertise_level
+                    )
+                    
+                    with st.expander("📖 Viability Analysis Legend", expanded=False):
+                        content = st_integration.formatter.create_expandable_legend(legend)
+                        st.markdown(content)
                 else:
                     st.warning("Viability data not available")
         else:
@@ -1778,6 +2166,24 @@ def main() -> None:
         st.header("Heatmaps")
         
         if df is not None and len(df) > 0 and 'PlateID' in df.columns:
+            # Legend expertise level selector for heatmaps
+            heatmap_expertise_col1, heatmap_expertise_col2 = st.columns([1, 3])
+            with heatmap_expertise_col1:
+                heatmap_legend_expertise = st.selectbox(
+                    "📖 Legend Detail Level",
+                    ["Basic", "Intermediate", "Expert"],
+                    index=1,  # Default to Intermediate
+                    help="Choose the level of detail for heatmap legends",
+                    key="heatmap_expertise"
+                )
+                heatmap_expertise_level = ExpertiseLevel(heatmap_legend_expertise.lower())
+            
+            with heatmap_expertise_col2:
+                st.info("💡 **Scientific legends are available for each heatmap** to explain the biological significance, statistical methods, and interpretation guidance.")
+            
+            # Initialize legend integration for heatmaps
+            heatmap_integrator = VisualizationIntegrator()
+            heatmap_st_integration = StreamlitIntegration(heatmap_integrator)
             # Get plate families
             plate_families = get_plate_families(df)
             
@@ -1904,6 +2310,17 @@ def main() -> None:
                                                     st.caption(f"{warning_color} Edge effects detected")
                                             
                                             st.plotly_chart(fig, use_container_width=True)
+                                            
+                                            # Add scientific legend for heatmap
+                                            heatmap_legend = heatmap_integrator.legend_manager.create_legend(
+                                                data=family_df,
+                                                chart_type=ChartType.HEATMAP,
+                                                expertise_level=heatmap_expertise_level
+                                            )
+                                            
+                                            with st.expander(f"📖 {label} Heatmap Legend", expanded=False):
+                                                heatmap_content = heatmap_st_integration.formatter.create_expandable_legend(heatmap_legend)
+                                                st.markdown(heatmap_content)
                                         else:
                                             st.warning(f"No data for {label}")
                                             
