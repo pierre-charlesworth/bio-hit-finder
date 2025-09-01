@@ -3,8 +3,8 @@ fastapi==0.100.0
 uvicorn==0.23.0
 python-multipart==0.0.6
 
-# Phase 2.1: Add pandas with known good wheels for Python 3.13
-pandas>=2.1.0,<2.2.0
+# Phase 2.1: Add pandas with Python 3.13 wheel support (cp313)
+pandas==2.2.3
 
 # Temporarily removed for later phases:
 # numpy - dependency of pandas, will be added next
