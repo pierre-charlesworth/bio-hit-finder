@@ -1247,6 +1247,78 @@ def main() -> None:
     with summary_tab:
         st.header("Summary")
         
+        # Scientific Methodology - Prominent box
+        methodology_container = st.container()
+        with methodology_container:
+            st.markdown("### 🔬 Scientific Methodology")
+            
+            method_col1, method_col2 = st.columns([1, 5])
+            with method_col1:
+                st.markdown("**Platform:**")
+                st.markdown("**Approach:**") 
+                st.markdown("**Statistics:**")
+                st.markdown("**Quality:**")
+            
+            with method_col2:
+                st.markdown("**BREAKthrough OM** - Dual-readout antimicrobial discovery targeting Gram-negative outer membrane")
+                st.markdown("**σE/Cpx stress monitoring** - lptA + ldtD reporters detect envelope disruption via orthogonal pathways")
+                st.markdown("**Robust Z-scores** - Median/MAD normalization resistant to outliers, optimized for screening")  
+                st.markdown("**ATP viability gating** - Excludes cytotoxic artifacts, focuses on viable stress responses")
+            
+            with st.expander("📖 **Detailed Scientific Background**", expanded=False):
+                method_tabs = st.tabs(["🔬 Platform Overview", "🧬 Biological Foundation", "📊 Statistical Methods", "✅ Quality Control"])
+                
+                with method_tabs[0]:
+                    st.markdown("""
+                    **The BREAKthrough Platform** represents a next-generation approach to antimicrobial discovery, specifically designed to identify compounds that disrupt the Gram-negative outer membrane (OM). 
+                    
+                    Developed as part of the European Union's Horizon Europe Programme, this platform addresses the critical need for novel antibiotics against multi-drug resistant pathogens by targeting the OM permeability barrier that protects Gram-negative bacteria. 
+                    
+                    The platform integrates **dual-reporter stress response monitoring** with **three-strain selectivity profiling** to provide mechanistically informed hit identification with reduced false positive rates.
+                    """)
+                
+                with method_tabs[1]:
+                    st.markdown("""
+                    **Outer Membrane Biology:** The outer membrane of Gram-negative bacteria serves as the primary permeability barrier limiting antibiotic efficacy. LPS transport via the Lpt machinery and peptidoglycan remodeling through L,D-transpeptidases represent critical envelope biogenesis pathways.
+                    
+                    **Stress Response Systems:** The σE and Cpx envelope stress response systems detect and respond to OM perturbations:
+                    - **lptA (σE-regulated):** LPS transport-specific monitoring
+                    - **ldtD (Cpx-regulated):** Structural compensation responses
+                    
+                    This **dual-reporter design** increases mechanistic specificity while reducing artifacts from non-specific stress responses.
+                    """)
+                
+                with method_tabs[2]:  
+                    st.markdown("""
+                    **Reporter Ratio Normalization:** BG/BT ratios provide internal normalization critical for robust screening:
+                    - **β-galactosidase (BG):** Transcriptional stress response intensity  
+                    - **ATP (BT):** Viable cell mass via BacTiter-Glo
+                    - **Correction for:** Inoculum density, growth effects, pipetting errors, plate variations
+                    
+                    **Robust Statistics:** Median/MAD methods tolerate outliers unlike mean/SD:
+                    - **Formula:** Z = (value - median) / (1.4826 × MAD)
+                    - **Advantage:** Stable with up to 50% outlier contamination
+                    - **B-scoring:** Median-polish removes spatial artifacts when detected
+                    """)
+                
+                with method_tabs[3]:
+                    st.markdown("""
+                    **Quality Control Framework:**
+                    - **Edge Effects:** Spatial correlation analysis detects periphery artifacts
+                    - **Row/Column Bias:** Identifies systematic pipetting or gradient effects  
+                    - **Statistical Distribution:** Flags unusual Z-score patterns or hit rates
+                    - **ATP Viability Gating:** f=0.3 threshold excludes cytotoxic artifacts
+                    
+                    **Expected Performance:**
+                    - Hit rates: ~1% of compound libraries
+                    - Validation success: 10-30% confirmation in secondary assays
+                    - Z' factor: >0.5 for robust assay windows
+                    """)
+                
+                st.info("💡 **This methodology ensures high-confidence identification of outer membrane permeabilizers with reduced false discovery rates.**")
+        
+        st.markdown("---")  # Visual separator
+        
         if df is not None and len(df) > 0:
             # Metrics row
             col1, col2, col3 = st.columns(3)
@@ -2002,19 +2074,42 @@ def main() -> None:
         st.header("Visualizations")
         
         if df is not None and len(df) > 0:
-            # Legend expertise level selector
-            expertise_col1, expertise_col2 = st.columns([1, 3])
-            with expertise_col1:
-                legend_expertise = st.selectbox(
-                    "📖 Legend Detail Level",
-                    ["Basic", "Intermediate", "Expert"],
-                    index=1,  # Default to Intermediate
-                    help="Choose the level of detail for figure legends"
-                )
-                expertise_level = ExpertiseLevel(legend_expertise.lower())
+            # Legend expertise level selector - Prominent section
+            st.markdown("### 📖 Figure Legends & Explanations")
             
-            with expertise_col2:
-                st.info("💡 **Legends have been added below each figure** to provide scientific context and interpretation guidance based on your selected detail level.")
+            legend_control_container = st.container()
+            with legend_control_container:
+                expertise_col1, expertise_col2, expertise_col3 = st.columns([1, 2, 3])
+                
+                with expertise_col1:
+                    legend_expertise = st.selectbox(
+                        "**Detail Level:**",
+                        ["Basic", "Intermediate", "Expert"],
+                        index=1,  # Default to Intermediate
+                        help="Choose how much scientific detail to include in figure legends"
+                    )
+                    expertise_level = ExpertiseLevel(legend_expertise.lower())
+                
+                with expertise_col2:
+                    # Show character count info
+                    char_info = {
+                        "Basic": "~500 chars",
+                        "Intermediate": "~1200 chars", 
+                        "Expert": "~2500 chars"
+                    }
+                    st.markdown(f"**Content:** {char_info[legend_expertise]}")
+                    st.markdown("**Includes:** Context + Methods + Interpretation")
+                
+                with expertise_col3:
+                    if legend_expertise == "Basic":
+                        st.info("🟢 **Basic Level** - Essential context for general understanding")
+                    elif legend_expertise == "Intermediate":  
+                        st.info("🟡 **Intermediate Level** - Balanced detail with biological and statistical context")
+                    else:
+                        st.info("🔴 **Expert Level** - Comprehensive methodology, formulas, and scientific references")
+            
+            st.markdown("**📊 Each visualization below includes an expandable scientific legend tailored to your selected detail level.**")
+            st.markdown("---")
             
             # Initialize legend integration
             integrator = VisualizationIntegrator()
@@ -2166,20 +2261,43 @@ def main() -> None:
         st.header("Heatmaps")
         
         if df is not None and len(df) > 0 and 'PlateID' in df.columns:
-            # Legend expertise level selector for heatmaps
-            heatmap_expertise_col1, heatmap_expertise_col2 = st.columns([1, 3])
-            with heatmap_expertise_col1:
-                heatmap_legend_expertise = st.selectbox(
-                    "📖 Legend Detail Level",
-                    ["Basic", "Intermediate", "Expert"],
-                    index=1,  # Default to Intermediate
-                    help="Choose the level of detail for heatmap legends",
-                    key="heatmap_expertise"
-                )
-                heatmap_expertise_level = ExpertiseLevel(heatmap_legend_expertise.lower())
+            # Legend expertise level selector for heatmaps - Prominent section  
+            st.markdown("### 📖 Heatmap Legends & Scientific Context")
             
-            with heatmap_expertise_col2:
-                st.info("💡 **Scientific legends are available for each heatmap** to explain the biological significance, statistical methods, and interpretation guidance.")
+            heatmap_legend_container = st.container()
+            with heatmap_legend_container:
+                heatmap_expertise_col1, heatmap_expertise_col2, heatmap_expertise_col3 = st.columns([1, 2, 3])
+                
+                with heatmap_expertise_col1:
+                    heatmap_legend_expertise = st.selectbox(
+                        "**Detail Level:**",
+                        ["Basic", "Intermediate", "Expert"],
+                        index=1,  # Default to Intermediate
+                        help="Choose how much scientific detail to include in heatmap legends",
+                        key="heatmap_expertise"
+                    )
+                    heatmap_expertise_level = ExpertiseLevel(heatmap_legend_expertise.lower())
+                
+                with heatmap_expertise_col2:
+                    # Show character count info
+                    char_info = {
+                        "Basic": "~500 chars",
+                        "Intermediate": "~1200 chars", 
+                        "Expert": "~2500 chars"
+                    }
+                    st.markdown(f"**Content:** {char_info[heatmap_legend_expertise]}")
+                    st.markdown("**Focus:** Spatial patterns + Biology + Statistics")
+                
+                with heatmap_expertise_col3:
+                    if heatmap_legend_expertise == "Basic":
+                        st.info("🟢 **Basic Level** - Essential heatmap interpretation for spatial patterns")
+                    elif heatmap_legend_expertise == "Intermediate":  
+                        st.info("🟡 **Intermediate Level** - Biological significance + statistical methods for heatmaps")
+                    else:
+                        st.info("🔴 **Expert Level** - Complete methodology + spatial analysis + edge effects")
+                        
+            st.markdown("**🔥 Each heatmap below includes a scientific legend explaining spatial patterns, biological significance, and statistical interpretation.**")
+            st.markdown("---")
             
             # Initialize legend integration for heatmaps
             heatmap_integrator = VisualizationIntegrator()
