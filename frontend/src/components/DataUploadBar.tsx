@@ -14,7 +14,8 @@ import {
   AlertCircle, 
   ChevronDown,
   Settings,
-  Play
+  Play,
+  Database
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -22,6 +23,7 @@ const DataUploadBar = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParametersExpanded, setIsParametersExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [useSampleData, setUseSampleData] = useState(false);
   
   // Configuration state
   const [viabilityThreshold, setViabilityThreshold] = useState(0.3);
@@ -69,6 +71,20 @@ const DataUploadBar = () => {
   const handleProcessData = () => {
     if (uploadedFile) {
       uploadMutation.mutate(uploadedFile);
+    } else if (useSampleData) {
+      // Process sample data
+      console.log('Processing sample data...');
+      uploadMutation.mutate(new File(['sample,data'], 'sample-data.csv', { type: 'text/csv' }));
+    }
+  };
+
+  const handleSampleDataToggle = () => {
+    const newUseSampleData = !useSampleData;
+    setUseSampleData(newUseSampleData);
+    
+    if (newUseSampleData) {
+      // Clear any uploaded file when using sample data
+      setUploadedFile(null);
     }
   };
 
@@ -82,6 +98,9 @@ const DataUploadBar = () => {
     if (uploadedFile) {
       return <Badge variant="secondary" className="gap-1"><CheckCircle className="h-3 w-3" />Ready</Badge>;
     }
+    if (useSampleData) {
+      return <Badge variant="secondary" className="gap-1"><Database className="h-3 w-3" />Sample Data</Badge>;
+    }
     return <Badge variant="outline" className="gap-1"><Upload className="h-3 w-3" />No Data</Badge>;
   };
 
@@ -90,7 +109,7 @@ const DataUploadBar = () => {
       <div className="container-fluid max-w-7xl mx-auto">
         {/* Main Bar */}
         <div className="flex items-center justify-between py-3">
-          {/* Left Side - Square Upload/Drop Area */}
+          {/* Left Side - Upload Area and Sample Data Toggle */}
           <div className="flex items-center gap-4">
             <div
               className={`relative h-12 w-12 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ${
@@ -98,6 +117,8 @@ const DataUploadBar = () => {
                   ? 'border-primary bg-primary/10' 
                   : uploadedFile
                   ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                  : useSampleData
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
                   : 'border-border hover:border-primary/50 hover:bg-muted/50'
               }`}
               onDrop={handleDrop}
@@ -110,19 +131,36 @@ const DataUploadBar = () => {
                 onChange={handleFileUpload}
                 className="hidden"
                 id="file-upload-square"
+                disabled={useSampleData}
               />
-              <label htmlFor="file-upload-square" className="absolute inset-0 flex items-center justify-center cursor-pointer">
+              <label 
+                htmlFor="file-upload-square" 
+                className={`absolute inset-0 flex items-center justify-center ${useSampleData ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+              >
                 {uploadMutation.isPending ? (
                   <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
                 ) : uploadedFile ? (
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 ) : uploadMutation.isError ? (
                   <AlertCircle className="h-5 w-5 text-red-500" />
+                ) : useSampleData ? (
+                  <Database className="h-5 w-5 text-blue-600" />
                 ) : (
                   <Upload className="h-5 w-5 text-muted-foreground" />
                 )}
               </label>
             </div>
+
+            {/* Sample Data Toggle */}
+            <Button
+              size="sm"
+              variant={useSampleData ? "default" : "outline"}
+              className="gap-1 h-12 px-3"
+              onClick={handleSampleDataToggle}
+            >
+              <Database className="h-4 w-4" />
+              {useSampleData ? 'Using Sample' : 'Sample Data'}
+            </Button>
             
             {/* File Info */}
             <div className="flex items-center gap-3">
@@ -132,6 +170,16 @@ const DataUploadBar = () => {
                     <p className="font-medium truncate max-w-40">{uploadedFile.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                  {getStatusBadge()}
+                </div>
+              ) : useSampleData ? (
+                <div className="flex items-center gap-2">
+                  <div className="text-sm">
+                    <p className="font-medium">Sample Screening Data</p>
+                    <p className="text-xs text-muted-foreground">
+                      384-well plate, 2000 compounds
                     </p>
                   </div>
                   {getStatusBadge()}
@@ -147,7 +195,7 @@ const DataUploadBar = () => {
 
           {/* Right Side - Action Buttons */}
           <div className="flex items-center gap-2">
-            {uploadedFile && (
+            {(uploadedFile || useSampleData) && (
               <Button 
                 size="sm" 
                 className="gap-1"
