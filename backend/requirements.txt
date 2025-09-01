@@ -15,6 +15,8 @@ plotly>=5.17.0
 # Phase 3.1: Add scipy with Python 3.13 wheel support (available since 1.14.1)
 scipy>=1.14.1
 
-# Remaining Phase 3 dependencies:
-# openpyxl - file processing (Phase 3.2)
-# pyyaml - config loading (Phase 3.3)
+# Phase 3.2: Add openpyxl for Excel file processing (pure Python)
+openpyxl>=3.1.0
+
+# Phase 3.3: Add pyyaml for configuration loading (C extension with wheels)
+pyyaml>=6.0
