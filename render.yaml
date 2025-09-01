@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: bio-hit-finder
+    runtime: python
+    plan: starter
+    buildCommand: |
+      # Install Node.js and npm
+      curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+      sudo apt-get install -y nodejs
+      
+      # Build frontend
+      cd frontend
+      npm install
+      npm run build
+      cd ..
+      
+      # Install Python dependencies
+      cd backend
+      pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: NODE_VERSION
+        value: 18
+    autoDeploy: false  # Manual deployments initially
+
+# Optional: Add database services later
+# databases:
+#   - name: postgres-db
+#     plan: starter

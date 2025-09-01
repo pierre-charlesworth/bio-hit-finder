@@ -1,0 +1,205 @@
+# Configuration file for bio-hit-finder platform
+# This file contains default parameters that can be overridden in the UI
+
+# Core processing parameters
+processing:
+  # Viability gate threshold (f) - wells with ATP < f * median(ATP) are flagged
+  viability_threshold: 0.3
+  
+  # Default Z-score cutoffs for hit calling
+  z_score_cutoff: 2.0
+  
+  # Number of top hits to display by default
+  top_n_hits: 50
+
+# Multi-stage hit calling parameters for dual-readout compound screening
+hit_calling:
+  # Enable multi-stage hit calling (reporter -> vitality -> platform)
+  multi_stage_enabled: true
+  
+  # Stage 1: Reporter hit detection
+  reporter:
+    # Z-score thresholds for hit calling
+    z_threshold_lptA: 2.0
+    z_threshold_ldtD: 2.0
+    
+    # Require viability for reporter hits
+    require_viability: true
+    
+    # Logical operation for combining lptA and ldtD hits (OR/AND)
+    combine_mode: "OR"  # Either lptA OR ldtD above threshold
+  
+  # Stage 2: Vitality hit detection (growth pattern analysis)
+  vitality:
+    # OD percentage thresholds for vitality assessment
+    tolC_max_threshold: 0.8   # tolC% must be <= 0.8
+    wt_min_threshold: 0.8     # WT% must be > 0.8
+    sa_min_threshold: 0.8     # SA% must be > 0.8
+    
+    # Require all conditions to be met
+    require_all_conditions: true
+  
+  # Stage 3: Platform hit detection (combines reporter and vitality)
+  platform:
+    # Require both reporter AND vitality hits for platform hit
+    require_both_stages: true
+
+# B-scoring (median-polish) parameters
+bscore:
+  # Whether to apply B-scoring by default
+  enabled: false
+  
+  # Maximum iterations for median polish
+  max_iterations: 10
+  
+  # Convergence tolerance
+  tolerance: 1.0e-6
+  
+  # Metrics to apply B-scoring to (when enabled)
+  apply_to:
+    - "Z_lptA"
+    - "Z_ldtD"
+    - "Ratio_lptA" 
+    - "Ratio_ldtD"
+
+# Edge-effect warning system
+edge_warning:
+  # Metric to use for edge-effect detection
+  metric: "Z_lptA"
+  
+  # Minimum wells required in each group (edge vs interior)
+  min_group_wells: 16
+  
+  # Detection thresholds
+  thresholds:
+    # Effect size (d) threshold for warnings
+    effect_size_d: 0.8
+    
+    # Spearman correlation threshold for row/column trends
+    spearman_rho: 0.5
+    
+    # Corner deviation threshold in MAD units
+    corner_mads: 1.2
+  
+  # Warning levels
+  levels:
+    info_d: 0.5      # INFO level threshold
+    warn_d: 0.8      # WARN level threshold  
+    critical_d: 1.5  # CRITICAL level threshold
+  
+  # Spatial autocorrelation (optional, computationally expensive)
+  spatial_autocorr:
+    enabled: false
+
+# Visualization settings
+visualization:
+  # Default colormap for heatmaps
+  colormaps:
+    # Diverging colormaps (center=0) for Z-scores and B-scores
+    diverging: "RdBu_r"
+    # Sequential colormaps for ratios and OD values
+    sequential: "viridis"
+  
+  # Figure export settings
+  export:
+    # DPI for static image exports
+    dpi: 300
+    # Image format for exports
+    format: "png"
+
+# Advanced visualization features (new)
+visualization_features:
+  qc_dashboard:
+    enabled: true
+    alert_thresholds:
+      z_factor_min: 0.5
+      sb_ratio_min: 1.5  # Adapted for P90/median approach
+      cv_percent_max: 20.0
+  
+  cross_reporter_correlation:
+    enabled: false  # Will enable in next feature
+    brushing_enabled: true
+    quadrant_analysis: true
+
+# Visualization performance parameters
+visualization_params:
+  performance:
+    max_points_scatter: 10000
+    decimation_threshold: 50000
+    cache_duration: 3600
+  
+  layout:
+    dashboard_columns: 3
+    responsive_breakpoint: 768
+    color_scheme: "scientific"
+
+# Export settings
+export:
+  # Default formats to include in ZIP bundle
+  formats:
+    - "csv"
+    - "png"
+    - "html"
+    - "pdf"
+  
+  # PDF report settings
+  pdf:
+    # Include formulas section
+    include_formulas: true
+    # Include methodology section
+    include_methodology: true
+    # Page format
+    page_format: "A4"
+    # Margins (in mm)
+    margins:
+      top: 20
+      bottom: 20
+      left: 15
+      right: 15
+
+# Performance settings
+performance:
+  # Cache settings for Streamlit
+  cache:
+    # TTL for file processing cache (seconds)
+    file_processing_ttl: 3600
+    # Maximum cache size (MB)
+    max_cache_size: 500
+  
+  # Memory limits
+  memory:
+    # Maximum memory per plate (MB)
+    max_plate_size: 100
+    # Switch to Polars backend if total memory > threshold (MB)
+    polars_threshold: 1000
+
+# Column mapping for auto-detection
+column_mapping:
+  # Required measurement columns with possible aliases
+  required:
+    BG_lptA: ["BG_lptA", "BetaGlo_lptA", "bg_lpta"]
+    BT_lptA: ["BT_lptA", "BacTiter_lptA", "bt_lpta", "ATP_lptA"]
+    BG_ldtD: ["BG_ldtD", "BetaGlo_ldtD", "bg_ldtd"]
+    BT_ldtD: ["BT_ldtD", "BacTiter_ldtD", "bt_ldtd", "ATP_ldtD"]
+    OD_WT: ["OD_WT", "OD600_WT", "optical_density_wt"]
+    OD_tolC: ["OD_tolC", "OD600_tolC", "optical_density_tolc"]
+    OD_SA: ["OD_SA", "OD600_SA", "optical_density_sa"]
+  
+  # Optional metadata columns
+  optional:
+    PlateID: ["PlateID", "Plate_ID", "plate_id", "Plate"]
+    Well: ["Well", "WellID", "well_id", "Position"]
+    Row: ["Row", "row"]
+    Col: ["Col", "Column", "column", "col"]
+    ControlType: ["ControlType", "Control_Type", "control", "Control"]
+
+# Logging configuration
+logging:
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
+  
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Enable structured logging for analysis steps
+  structured: true

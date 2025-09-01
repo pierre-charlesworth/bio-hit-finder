@@ -1,0 +1,78 @@
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Circle } from 'lucide-react';
+import { useApiTest } from '@/hooks/useApi';
+
+const Hero = () => {
+  const { data: apiTest, isLoading, isError } = useApiTest();
+
+  return (
+    <section className="min-h-screen flex items-center justify-center pt-16">
+      <div className="container-fluid max-w-7xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto">
+          {/* Connection Status */}
+          <div className="mb-8">
+            <Badge variant={isError ? "destructive" : isLoading ? "secondary" : "default"} className="mb-4">
+              <Circle className={`w-2 h-2 mr-2 ${isError ? 'fill-red-500' : isLoading ? 'fill-yellow-500' : 'fill-green-500'}`} />
+              {isError ? 'Backend Disconnected' : isLoading ? 'Connecting...' : 'Backend Connected'}
+            </Badge>
+          </div>
+
+          <h1 className="text-fluid-3xl font-light tracking-tight text-reveal">
+            BREAKthrough OM{' '}
+            <span className="font-medium">Screening Platform</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-muted-foreground mt-8 max-w-2xl mx-auto text-reveal" style={{animationDelay: '0.2s'}}>
+            Advanced biotech screening platform for drug discovery research,
+            featuring B-scoring analysis and automated hit identification.
+          </p>
+
+          {/* Platform Features */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-4xl mx-auto text-reveal" style={{animationDelay: '0.3s'}}>
+            <div className="text-center p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="text-2xl font-light mb-2">01</div>
+              <div className="text-sm font-medium mb-1">B-Score Analysis</div>
+              <div className="text-xs text-muted-foreground">Statistical Methods</div>
+            </div>
+            <div className="text-center p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="text-2xl font-light mb-2">02</div>
+              <div className="text-sm font-medium mb-1">Edge Detection</div>
+              <div className="text-xs text-muted-foreground">Quality Control</div>
+            </div>
+            <div className="text-center p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="text-2xl font-light mb-2">03</div>
+              <div className="text-sm font-medium mb-1">Multi-Strain</div>
+              <div className="text-xs text-muted-foreground">Flexibility</div>
+            </div>
+            <div className="text-center p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="text-2xl font-light mb-2">04</div>
+              <div className="text-sm font-medium mb-1">Export & Reports</div>
+              <div className="text-xs text-muted-foreground">Data Management</div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12 text-reveal" style={{animationDelay: '0.5s'}}>
+            <Button 
+              size="lg" 
+              className="group"
+            >
+              Upload Data
+              <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="lg"
+              className="hover-lift"
+            >
+              View Demo
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Hero;
