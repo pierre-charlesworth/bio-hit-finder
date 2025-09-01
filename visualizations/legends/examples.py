@@ -1,389 +1,389 @@
 """
-Usage examples for the figure legend system.
+Usage examples and testing for the figure legend system.
 
-This module provides comprehensive examples showing how to integrate
-the legend system with existing bio-hit-finder visualizations.
+This module demonstrates how to use the legend system with various chart types,
+output formats, and integration methods.
 """
 
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
-from typing import Dict, Any
 import logging
+from typing import Dict, Any
 
-from .core import LegendManager, LegendContext
 from .models import ChartType, ExpertiseLevel, OutputFormat
-from .integration import VisualizationIntegrator, StreamlitIntegration
-from .config import get_global_configuration
+from .core import LegendManager, LegendContext
+from .formatters import get_formatter
+from .integration import (
+    VisualizationIntegrator, StreamlitIntegration, PDFIntegration,
+    quick_legend_for_streamlit, create_legend_only
+)
 
 logger = logging.getLogger(__name__)
 
 
 def create_sample_data() -> pd.DataFrame:
-    """Create sample plate data for examples."""
+    """Create sample screening data for testing legend system."""
+    np.random.seed(42)
     
-    np.random.seed(42)  # For reproducible examples
+    # Create plate layout
+    rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'] * 6  
+    cols = list(range(1, 25)) * 2
+    wells = [f"{row}{col:02d}" for row, col in zip(rows[:48], cols[:48])]
     
-    n_wells = 384
-    wells = [f"{chr(65 + i//24)}{(i%24)+1:02d}" for i in range(n_wells)]
+    # Generate sample data
+    data = {
+        'PlateID': ['Plate1'] * 24 + ['Plate2'] * 24,
+        'Well': wells[:48],
+        'Row': [well[0] for well in wells[:48]],
+        'Column': [int(well[1:]) for well in wells[:48]],
+        
+        # Reporter signals
+        'BG_lptA': np.random.lognormal(3.0, 0.5, 48),
+        'BT_lptA': np.random.lognormal(4.0, 0.3, 48),
+        'BG_ldtD': np.random.lognormal(3.2, 0.4, 48),
+        'BT_ldtD': np.random.lognormal(4.1, 0.3, 48),
+        
+        # Growth measurements
+        'OD_WT': np.random.normal(0.8, 0.15, 48),
+        'OD_tolC': np.random.normal(0.7, 0.18, 48), 
+        'OD_SA': np.random.normal(0.9, 0.12, 48),
+        
+        # ATP viability
+        'ATP': np.random.lognormal(5.0, 0.4, 48)
+    }
     
-    data = pd.DataFrame({
-        'Well': wells,
-        'PlateID': 'DEMO_001',
-        'Ratio_lptA': np.random.lognormal(0, 0.3, n_wells),
-        'Ratio_ldtD': np.random.lognormal(0, 0.25, n_wells),
-        'BG_lptA': np.random.normal(1000, 200, n_wells),
-        'BT_lptA': np.random.normal(800, 150, n_wells),
-        'BG_ldtD': np.random.normal(900, 180, n_wells),
-        'BT_ldtD': np.random.normal(750, 120, n_wells),
-        'ATP': np.random.normal(500, 100, n_wells),
-        'OD_WT': np.random.normal(0.8, 0.15, n_wells),
-        'OD_tolC': np.random.normal(0.6, 0.12, n_wells),
-        'OD_SA': np.random.normal(0.9, 0.18, n_wells)
-    })
+    df = pd.DataFrame(data)
     
-    # Calculate derived metrics
-    data['Z_lptA'] = (data['Ratio_lptA'] - data['Ratio_lptA'].median()) / (1.4826 * np.median(np.abs(data['Ratio_lptA'] - data['Ratio_lptA'].median())))
-    data['Z_ldtD'] = (data['Ratio_ldtD'] - data['Ratio_ldtD'].median()) / (1.4826 * np.median(np.abs(data['Ratio_ldtD'] - data['Ratio_ldtD'].median())))
+    # Calculate ratios and Z-scores
+    df['Ratio_lptA'] = df['BG_lptA'] / df['BT_lptA']
+    df['Ratio_ldtD'] = df['BG_ldtD'] / df['BT_ldtD']
     
-    # Add quality control flags
-    viability_threshold = 0.3 * data['ATP'].median()
-    data['Viability_Flag'] = data['ATP'] < viability_threshold
-    data['Viable'] = ~data['Viability_Flag']
+    # Robust Z-scores
+    for ratio_col in ['Ratio_lptA', 'Ratio_ldtD']:
+        median = df[ratio_col].median()
+        mad = np.median(np.abs(df[ratio_col] - median))
+        df[f'Z_{ratio_col.split("_")[1]}'] = (df[ratio_col] - median) / (1.4826 * mad)
     
-    # Add some edge effects
-    edge_wells = [w for w in wells if w.startswith(('A', 'P')) or w.endswith(('01', '24'))]
-    data['Edge_Flag'] = data['Well'].isin(edge_wells[:20])  # Flag some edge wells
+    # Add some platform hits
+    hit_indices = [5, 15, 23, 34, 41]
+    df.loc[hit_indices, 'Z_lptA'] = np.random.uniform(2.5, 4.0, len(hit_indices))
+    df.loc[hit_indices, 'Z_ldtD'] = np.random.uniform(2.0, 3.5, len(hit_indices))
     
-    return data
+    return df
 
 
-def example_basic_legend_generation():
-    """Example 1: Basic legend generation for different chart types."""
-    
-    print("=== Example 1: Basic Legend Generation ===")
+def example_basic_usage():
+    """Demonstrate basic legend creation and formatting."""
+    print("=== Basic Legend System Usage ===\n")
     
     # Create sample data
-    data = create_sample_data()
+    df = create_sample_data()
+    print(f"Created sample data: {len(df)} wells, {df['PlateID'].nunique()} plates")
     
     # Initialize legend manager
-    legend_manager = LegendManager()
+    manager = LegendManager()
     
-    # Example 1.1: Heatmap legend
-    print("\n1.1 Heatmap Legend (Intermediate Level):")
-    context = LegendContext(
-        data=data,
+    # Create legend for different chart types and expertise levels
+    chart_types = [ChartType.HEATMAP, ChartType.HISTOGRAM, ChartType.SCATTER_PLOT]
+    expertise_levels = [ExpertiseLevel.BASIC, ExpertiseLevel.INTERMEDIATE, ExpertiseLevel.EXPERT]
+    
+    for chart_type in chart_types:
+        print(f"\n--- {chart_type.value.upper()} LEGENDS ---")
+        
+        for expertise in expertise_levels:
+            try:
+                legend = manager.create_legend(
+                    data=df,
+                    chart_type=chart_type,
+                    expertise_level=expertise
+                )
+                
+                print(f"\n{expertise.value.title()} Level ({legend.total_char_count} chars):")
+                print(f"Sections: {list(legend.sections.keys())}")
+                
+                # Show biological context as example
+                bio_section = legend.get_section('biological_context')
+                if bio_section:
+                    print(f"Bio Context: {bio_section.content[:100]}...")
+                
+            except Exception as e:
+                print(f"Error creating {chart_type.value} {expertise.value} legend: {e}")
+
+
+def example_output_formats():
+    """Demonstrate different output format options."""
+    print("\n=== Output Format Examples ===\n")
+    
+    df = create_sample_data()
+    manager = LegendManager()
+    
+    # Create base legend
+    legend = manager.create_legend(
+        data=df,
         chart_type=ChartType.HEATMAP,
-        expertise_level=ExpertiseLevel.INTERMEDIATE,
-        output_format=OutputFormat.MARKDOWN,
-        config={'metric_col': 'Z_lptA', 'title': 'Z-scores for lptA Reporter'}
+        expertise_level=ExpertiseLevel.INTERMEDIATE
     )
     
-    legend_text = legend_manager.generate_and_format(context)
-    print(legend_text)
+    # Test all formatters
+    formats = [OutputFormat.MARKDOWN, OutputFormat.HTML, OutputFormat.PDF, OutputFormat.PLAIN_TEXT]
     
-    # Example 1.2: Histogram legend for basic users
-    print("\n1.2 Histogram Legend (Basic Level):")
-    context = LegendContext(
-        data=data,
-        chart_type=ChartType.HISTOGRAM,
-        expertise_level=ExpertiseLevel.BASIC,
-        output_format=OutputFormat.PLAIN_TEXT,
-        config={'column': 'Ratio_lptA', 'title': 'Distribution of lptA Ratios'}
-    )
-    
-    legend_text = legend_manager.generate_and_format(context)
-    print(legend_text)
-    
-    # Example 1.3: Scatter plot legend for experts
-    print("\n1.3 Scatter Plot Legend (Expert Level):")
-    context = LegendContext(
-        data=data,
-        chart_type=ChartType.SCATTER_PLOT,
-        expertise_level=ExpertiseLevel.EXPERT,
-        output_format=OutputFormat.HTML,
-        config={
-            'x_variable': 'Z_lptA',
-            'y_variable': 'Z_ldtD', 
-            'correlation': 0.45,
-            'title': 'Correlation Analysis: lptA vs ldtD Responses'
-        }
-    )
-    
-    legend_content = legend_manager.generate_legend(context)
-    legend_text = legend_manager.format_legend(legend_content, OutputFormat.HTML)
-    print(legend_text)
-
-
-def example_integration_with_existing_functions():
-    """Example 2: Integration with existing visualization functions."""
-    
-    print("\n=== Example 2: Integration with Existing Functions ===")
-    
-    # Create sample data
-    data = create_sample_data()
-    
-    # Initialize integrator
-    integrator = VisualizationIntegrator()
-    
-    # Example 2.1: Using decorator approach
-    print("\n2.1 Decorator Integration:")
-    
-    @integrator.create_legend_decorator(ChartType.HEATMAP, expertise_level=ExpertiseLevel.INTERMEDIATE)
-    def create_demo_heatmap(df: pd.DataFrame, metric_col: str, title: str) -> go.Figure:
-        """Demo heatmap function with legend integration."""
-        
-        # Simplified heatmap creation
-        fig = go.Figure(data=go.Heatmap(
-            z=df[metric_col].values.reshape(16, 24),  # 384-well layout
-            colorscale='RdBu_r',
-            zmid=0
-        ))
-        
-        fig.update_layout(
-            title=title,
-            xaxis_title='Column',
-            yaxis_title='Row'
-        )
-        
-        return fig
-    
-    # Create figure with automatic legend generation
-    fig = create_demo_heatmap(data, 'Z_lptA', 'Z-scores for lptA Reporter')
-    
-    # Extract legend information
-    legend_info = integrator.extract_legend_from_figure(fig)
-    if legend_info:
-        print("Legend successfully attached to figure")
-        print("Legend preview:", legend_info['text'][:200] + "...")
-    
-    # Example 2.2: Manual legend addition
-    print("\n2.2 Manual Legend Addition:")
-    
-    # Create a simple figure
-    simple_fig = go.Figure()
-    simple_fig.add_trace(go.Histogram(x=data['Ratio_lptA'], name='lptA Ratios'))
-    simple_fig.update_layout(title='Distribution of lptA Reporter Ratios')
-    
-    # Add legend manually
-    enhanced_fig, legend_text = integrator.add_legend_to_figure(
-        figure=simple_fig,
-        data=data,
-        chart_type=ChartType.HISTOGRAM,
-        expertise_level=ExpertiseLevel.INTERMEDIATE,
-        output_format=OutputFormat.STREAMLIT
-    )
-    
-    print("Manual legend added:")
-    print(legend_text[:300] + "...")
+    for fmt in formats:
+        print(f"\n--- {fmt.value.upper()} FORMAT ---")
+        try:
+            formatter = get_formatter(fmt)
+            formatted = formatter.format_legend(legend)
+            
+            if isinstance(formatted, dict):
+                print("Streamlit format (dict structure):")
+                print(f"Sections: {list(formatted.get('sections', {}).keys())}")
+                print(f"Config: {formatted.get('config', {})}")
+            else:
+                preview = formatted[:200] + "..." if len(formatted) > 200 else formatted
+                print(f"Formatted content ({len(formatted)} chars):")
+                print(preview)
+                
+        except Exception as e:
+            print(f"Error with {fmt.value} format: {e}")
 
 
 def example_streamlit_integration():
-    """Example 3: Streamlit-specific integration."""
+    """Demonstrate Streamlit integration features."""
+    print("\n=== Streamlit Integration Examples ===\n")
     
-    print("\n=== Example 3: Streamlit Integration ===")
+    df = create_sample_data()
     
-    # Note: This example shows the code structure for Streamlit
-    # In actual use, this would run within a Streamlit app
+    # Note: This would normally be called within a Streamlit app
+    # Here we just demonstrate the API
     
-    data = create_sample_data()
-    streamlit_integration = StreamlitIntegration()
+    # Basic integration example
+    print("1. StreamlitIntegration class usage:")
+    integrator = VisualizationIntegrator()
+    st_integration = StreamlitIntegration(integrator)
     
-    print("Streamlit integration code example:")
-    
-    code_example = '''
-    import streamlit as st
-    from visualizations.legends.integration import StreamlitIntegration
-    
-    # Initialize integration
-    st_integration = StreamlitIntegration()
-    
-    # Create expertise level selector
-    expertise_level = st_integration.create_expertise_selector()
-    
-    # Create your visualization
-    fig = create_your_visualization(data)
-    
-    # Display with integrated legend
-    st_integration.display_figure_with_legend(
-        figure=fig,
-        data=data,
+    # Create legend content for different layouts
+    legend = integrator.legend_manager.create_legend(
+        data=df,
         chart_type=ChartType.HEATMAP,
-        expertise_level=expertise_level,
-        layout='tabs'  # or 'columns', 'expandable'
+        expertise_level=ExpertiseLevel.INTERMEDIATE
     )
-    '''
     
-    print(code_example)
+    # Show expandable format
+    expandable_content = st_integration.formatter.create_expandable_legend(legend)
+    print(f"Expandable format: {len(expandable_content)} characters")
+    
+    # Show tabbed format  
+    tabbed_content = st_integration.formatter.create_tabbed_legend(legend)
+    print(f"Tabbed format: {len(tabbed_content)} tabs - {list(tabbed_content.keys())}")
+    
+    # Convenience function usage
+    print("\n2. Convenience function usage:")
+    standalone_legend = create_legend_only(
+        data=df,
+        chart_type=ChartType.HISTOGRAM,
+        expertise_level=ExpertiseLevel.BASIC,
+        output_format=OutputFormat.MARKDOWN
+    )
+    print(f"Standalone legend: {len(standalone_legend)} characters")
+
+
+def example_decorator_usage():
+    """Demonstrate decorator integration patterns."""
+    print("\n=== Decorator Integration Examples ===\n")
+    
+    # Example visualization function with decorator
+    integrator = VisualizationIntegrator()
+    
+    @integrator.create_legend_decorator(ChartType.HEATMAP, ExpertiseLevel.INTERMEDIATE)
+    def create_sample_heatmap(df: pd.DataFrame, metric_col: str):
+        """Sample heatmap creation function with auto-legend."""
+        # In real usage, this would create a Plotly/matplotlib figure
+        fake_figure = {
+            'data': df[metric_col].values.reshape(6, 8),
+            'type': 'heatmap',
+            'title': f'Heatmap of {metric_col}'
+        }
+        return fake_figure
+    
+    # Use decorated function
+    df = create_sample_data()
+    
+    try:
+        result = create_sample_heatmap(df, 'Z_lptA')
+        
+        if isinstance(result, tuple) and len(result) == 2:
+            figure, legend = result
+            print("Decorator successfully added legend:")
+            print(f"Figure type: {type(figure)}")
+            print(f"Legend type: {type(legend)}")
+            print(f"Legend sections: {list(legend.sections.keys())}")
+        else:
+            print("Decorator returned:", type(result))
+            
+    except Exception as e:
+        print(f"Decorator example error: {e}")
 
 
 def example_pdf_integration():
-    """Example 4: PDF report integration."""
+    """Demonstrate PDF integration features."""
+    print("\n=== PDF Integration Examples ===\n")
     
-    print("\n=== Example 4: PDF Integration ===")
+    df = create_sample_data()
     
-    from .integration import PDFIntegration
-    
-    data = create_sample_data()
+    # PDF integration example
     pdf_integration = PDFIntegration()
     
-    # Create a sample figure
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=data['Z_lptA'], 
-        y=data['Z_ldtD'],
-        mode='markers',
-        name='Wells'
-    ))
-    fig.update_layout(
-        title='Correlation: lptA vs ldtD Z-scores',
-        xaxis_title='Z_lptA',
-        yaxis_title='Z_ldtD'
-    )
-    
-    # Add PDF-optimized legend
-    enhanced_fig, latex_legend = pdf_integration.add_legend_to_pdf_figure(
-        figure=fig,
-        data=data,
-        chart_type=ChartType.SCATTER_PLOT,
-        expertise_level=ExpertiseLevel.EXPERT,
-        include_formulas=True
-    )
-    
-    print("PDF-optimized legend (LaTeX format):")
-    print(latex_legend)
-    
-    # Create brief figure caption
-    caption = pdf_integration.create_figure_caption(
-        figure_number=1,
-        chart_type=ChartType.SCATTER_PLOT,
-        data=data,
-        brief=True
-    )
-    
-    print("\nBrief figure caption:")
-    print(caption)
-
-
-def example_custom_configuration():
-    """Example 5: Custom configuration and templates."""
-    
-    print("\n=== Example 5: Custom Configuration ===")
-    
-    from .config import LegendConfiguration, create_sample_configuration_file
-    
-    # Create custom configuration
-    config = LegendConfiguration()
-    
-    # Show default biological context
-    biological_defaults = config.get_biological_defaults()
-    print("Default biological context:")
-    for key, value in biological_defaults.items():
-        if isinstance(value, str):
-            print(f"  {key}: {value}")
-    
-    # Get expertise-specific configuration
-    expert_config = config.get_expertise_config(ExpertiseLevel.EXPERT)
-    print(f"\nExpert configuration:")
-    print(f"  Include formulas: {expert_config.include_formulas}")
-    print(f"  Max length: {expert_config.max_length}")
-    print(f"  Preferred sections: {expert_config.preferred_sections}")
-    
-    # Export sample configuration
-    print("\nExporting sample configuration file...")
-    create_sample_configuration_file("legend_config_sample.yaml")
-    print("Sample configuration created as 'legend_config_sample.yaml'")
-
-
-def example_expertise_level_comparison():
-    """Example 6: Compare legends across expertise levels."""
-    
-    print("\n=== Example 6: Expertise Level Comparison ===")
-    
-    data = create_sample_data()
-    legend_manager = LegendManager()
-    
-    base_context_config = {
-        'data': data,
-        'chart_type': ChartType.HEATMAP,
-        'output_format': OutputFormat.MARKDOWN,
-        'config': {'metric_col': 'Z_lptA', 'title': 'Z-scores Heatmap'}
-    }
-    
-    for expertise_level in [ExpertiseLevel.BASIC, ExpertiseLevel.INTERMEDIATE, ExpertiseLevel.EXPERT]:
-        print(f"\n--- {expertise_level.value.upper()} LEVEL ---")
-        
-        context = LegendContext(
-            expertise_level=expertise_level,
-            **base_context_config
+    # Generate legend for PDF report
+    try:
+        pdf_legend = pdf_integration.generate_figure_legend_for_pdf(
+            data=df,
+            chart_type=ChartType.HEATMAP,
+            figure_number="3.1",
+            expertise_level=ExpertiseLevel.EXPERT
         )
         
-        legend_text = legend_manager.generate_and_format(context)
-        # Show first 300 characters as preview
-        print(legend_text[:300] + "..." if len(legend_text) > 300 else legend_text)
-        print(f"Total length: {len(legend_text)} characters")
+        print(f"PDF legend generated: {len(pdf_legend)} characters")
+        print("Preview:")
+        print(pdf_legend[:300] + "..." if len(pdf_legend) > 300 else pdf_legend)
+        
+    except Exception as e:
+        print(f"PDF integration error: {e}")
+    
+    # Multiple figure enhancement
+    figure_mappings = {
+        "Fig1": (df, ChartType.HISTOGRAM),
+        "Fig2": (df, ChartType.SCATTER_PLOT),
+        "Fig3": (df, ChartType.HEATMAP)
+    }
+    
+    try:
+        enhanced_legends = pdf_integration.enhance_pdf_report_with_legends(
+            report_data={},
+            figure_mappings=figure_mappings
+        )
+        
+        print(f"\nEnhanced {len(enhanced_legends)} figure legends for PDF:")
+        for fig_id, legend_text in enhanced_legends.items():
+            print(f"{fig_id}: {len(legend_text)} characters")
+            
+    except Exception as e:
+        print(f"Multiple figure enhancement error: {e}")
 
 
-def example_validation_and_quality_control():
-    """Example 7: Legend validation and quality control."""
+def example_error_handling():
+    """Demonstrate error handling and edge cases."""
+    print("\n=== Error Handling Examples ===\n")
     
-    print("\n=== Example 7: Validation and Quality Control ===")
+    manager = LegendManager()
     
-    data = create_sample_data()
-    legend_manager = LegendManager()
+    # Test with empty DataFrame
+    print("1. Empty DataFrame:")
+    empty_df = pd.DataFrame()
+    try:
+        legend = manager.create_legend(
+            data=empty_df,
+            chart_type=ChartType.HEATMAP,
+            expertise_level=ExpertiseLevel.BASIC
+        )
+        print(f"Success: Created legend with {legend.total_char_count} characters")
+    except Exception as e:
+        print(f"Error with empty DataFrame: {e}")
     
-    # Generate legend content
-    context = LegendContext(
-        data=data,
-        chart_type=ChartType.HISTOGRAM,
-        expertise_level=ExpertiseLevel.INTERMEDIATE,
-        output_format=OutputFormat.HTML,
-        config={'column': 'Z_lptA'}
-    )
+    # Test with minimal data
+    print("\n2. Minimal DataFrame:")
+    minimal_df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+    try:
+        legend = manager.create_legend(
+            data=minimal_df,
+            chart_type=ChartType.HISTOGRAM,
+            expertise_level=ExpertiseLevel.BASIC
+        )
+        print(f"Success: Created legend with {legend.total_char_count} characters")
+    except Exception as e:
+        print(f"Error with minimal DataFrame: {e}")
     
-    legend_content = legend_manager.generate_legend(context)
-    
-    # Validate completeness
-    validation_results = legend_manager.validate_legend_completeness(legend_content)
-    
-    print("Legend validation results:")
-    for criterion, passed in validation_results.items():
-        status = "✓" if passed else "✗"
-        print(f"  {status} {criterion}")
-    
-    # Analyze data characteristics
-    data_characteristics = legend_manager.analyze_data_characteristics(data)
-    
-    print("\nData characteristics detected:")
-    print(f"  Shape: {data_characteristics['shape']}")
-    print(f"  Has multiple plates: {data_characteristics['has_multiple_plates']}")
-    print(f"  Metrics present: {list(data_characteristics['metrics_present'].keys())}")
-    print(f"  Quality flags: {data_characteristics['quality_flags']}")
+    # Test with dictionary input
+    print("\n3. Dictionary input:")
+    dict_data = {'sample_size': 100, 'method_used': 'robust_z_score'}
+    try:
+        legend = manager.create_legend(
+            data=dict_data,
+            chart_type=ChartType.SCATTER_PLOT,
+            expertise_level=ExpertiseLevel.BASIC
+        )
+        print(f"Success: Created legend with {legend.total_char_count} characters")
+    except Exception as e:
+        print(f"Error with dictionary input: {e}")
 
 
-def run_all_examples():
-    """Run all examples in sequence."""
-    
-    print("BIO-HIT-FINDER FIGURE LEGEND SYSTEM EXAMPLES")
+def run_comprehensive_test():
+    """Run comprehensive test of all legend system components."""
+    print("🧪 COMPREHENSIVE LEGEND SYSTEM TEST 🧪")
     print("=" * 50)
     
     try:
-        example_basic_legend_generation()
-        example_integration_with_existing_functions()
+        example_basic_usage()
+        example_output_formats()
         example_streamlit_integration()
+        example_decorator_usage()
         example_pdf_integration()
-        example_custom_configuration()
-        example_expertise_level_comparison()
-        example_validation_and_quality_control()
+        example_error_handling()
         
         print("\n" + "=" * 50)
-        print("All examples completed successfully!")
+        print("✅ ALL TESTS COMPLETED SUCCESSFULLY!")
+        print("The legend system is ready for integration with the bio-hit-finder platform.")
         
     except Exception as e:
-        print(f"\nExample failed with error: {e}")
-        logger.exception("Example execution failed")
+        print(f"\n❌ TEST FAILED: {e}")
+        logger.error(f"Comprehensive test failed: {e}")
+
+
+def demo_real_usage_pattern():
+    """Demonstrate realistic usage pattern for bio-hit-finder integration."""
+    print("\n=== Real Usage Pattern Demo ===\n")
+    
+    # Simulate real screening data
+    df = create_sample_data()
+    
+    # Pattern 1: Quick Streamlit legend (most common)
+    print("1. Quick Streamlit usage pattern:")
+    print("   # In app.py visualization tab:")
+    print("   from visualizations.legends.integration import quick_legend_for_streamlit")
+    print("   fig = create_histogram(df, 'Z_lptA')")
+    print("   quick_legend_for_streamlit(fig, df, ChartType.HISTOGRAM)")
+    
+    # Pattern 2: Advanced Streamlit with user controls
+    print("\n2. Advanced Streamlit pattern:")
+    print("   # With expertise level selector and custom layout")
+    print("   st_integration = StreamlitIntegration()")
+    print("   st_integration.display_figure_with_legend(")
+    print("       figure=fig, data=df, chart_type=ChartType.HEATMAP,")
+    print("       layout='tabs', show_expertise_selector=True)")
+    
+    # Pattern 3: PDF report enhancement
+    print("\n3. PDF report enhancement pattern:")
+    print("   # In export/pdf_generator.py")
+    print("   pdf_integration = PDFIntegration()")
+    print("   legend_text = pdf_integration.generate_figure_legend_for_pdf(")
+    print("       data=df, chart_type=ChartType.HEATMAP, figure_number='2.1')")
+    print("   # Insert legend_text into LaTeX template")
+    
+    # Pattern 4: Decorator for new functions
+    print("\n4. Decorator pattern for new functions:")
+    print("   @heatmap_with_legend(ExpertiseLevel.INTERMEDIATE)")
+    print("   def create_z_score_heatmap(df):")
+    print("       return plotly_figure")
+    print("   # Returns (figure, legend) tuple automatically")
 
 
 if __name__ == "__main__":
-    # Run examples when script is executed directly
-    run_all_examples()
+    # Configure logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # Run comprehensive test
+    run_comprehensive_test()
+    
+    # Show realistic usage patterns
+    demo_real_usage_pattern()

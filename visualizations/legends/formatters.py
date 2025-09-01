@@ -1,665 +1,664 @@
 """
-Output formatters for figure legends.
+Output formatters for different display formats.
 
-This module provides formatters that convert LegendContent objects into
-format-specific output suitable for different contexts (HTML, PDF, Streamlit, etc.).
+This module provides formatters that convert legend content into various output
+formats including Streamlit markdown, HTML, PDF, and plain text.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
-import html
-import re
 import logging
-from datetime import datetime
+import re
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Any, Union
+from dataclasses import asdict
 
-from .models import LegendContent, LegendSection, OutputFormat, ExpertiseLevel
+from .models import (
+    LegendContent, LegendSection, ContentSection, ExpertiseLevel, 
+    OutputFormat, ChartType
+)
 
 logger = logging.getLogger(__name__)
 
 
-class LegendFormatter(ABC):
+class BaseFormatter(ABC):
     """Abstract base class for legend formatters."""
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        self.config = config or {}
+    def __init__(self, output_format: OutputFormat):
+        """Initialize formatter with output format."""
+        self.output_format = output_format
     
     @abstractmethod
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend content for specific output type."""
+    def format_legend(self, legend: LegendContent, **kwargs) -> str:
+        """Format complete legend content."""
         pass
     
-    def _format_section_title(self, title: str) -> str:
-        """Format section title. Override in subclasses for specific styling."""
+    @abstractmethod
+    def format_section(self, section: LegendSection, **kwargs) -> str:
+        """Format individual legend section."""
+        pass
+    
+    def format_title(self, title: str, level: int = 1, **kwargs) -> str:
+        """Format section titles (to be overridden by subclasses)."""
         return title
+
+
+class StreamlitFormatter(BaseFormatter):
+    """Formatter for Streamlit markdown output with interactive components."""
     
-    def _format_section_content(self, content: str, use_bullet_points: bool = False) -> str:
-        """Format section content. Override in subclasses for specific styling."""
-        if use_bullet_points:
-            # Convert bullet point markers to appropriate format
-            content = re.sub(r'^•\s*', '• ', content, flags=re.MULTILINE)
+    def __init__(self):
+        super().__init__(OutputFormat.STREAMLIT)
+        self.icon_map = {
+            ContentSection.BIOLOGICAL_CONTEXT: "🔬",
+            ContentSection.STATISTICAL_METHODS: "📊", 
+            ContentSection.INTERPRETATION_GUIDE: "🎯",
+            ContentSection.QUALITY_CONTROL: "⚙️",
+            ContentSection.TECHNICAL_DETAILS: "🧮",
+            ContentSection.REFERENCES: "📚",
+            ContentSection.LIMITATIONS: "⚠️"
+        }
+    
+    def format_legend(
+        self, 
+        legend: LegendContent, 
+        layout: str = "tabs",
+        show_expertise_selector: bool = True,
+        expand_by_default: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Format legend for Streamlit display with interactive options.
+        
+        Args:
+            legend: Legend content to format
+            layout: 'tabs', 'expander', 'columns', or 'sequential'
+            show_expertise_selector: Whether to include expertise level selector
+            expand_by_default: Whether expandable sections start expanded
+            
+        Returns:
+            Dictionary with formatted content and display instructions
+        """
+        try:
+            formatted_sections = {}
+            display_config = {
+                'layout': layout,
+                'expertise_level': legend.expertise_level.value,
+                'chart_type': legend.chart_type.value,
+                'total_char_count': legend.total_char_count,
+                'expand_by_default': expand_by_default
+            }
+            
+            # Format each section
+            for section_type, section in legend.sections.items():
+                formatted_sections[section_type.value] = {
+                    'title': self._format_section_title(section),
+                    'content': self._format_section_content(section),
+                    'icon': self.icon_map.get(section_type, "📋"),
+                    'priority': section.priority,
+                    'char_count': section.char_count
+                }
+            
+            # Add metadata
+            if show_expertise_selector:
+                display_config['expertise_options'] = [
+                    "Basic", "Intermediate", "Expert"
+                ]
+                display_config['current_expertise'] = legend.expertise_level.value.title()
+            
+            return {
+                'sections': formatted_sections,
+                'config': display_config,
+                'summary': self._create_summary(legend)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error formatting legend for Streamlit: {e}")
+            return {'error': str(e)}
+    
+    def format_section(self, section: LegendSection, **kwargs) -> str:
+        """Format individual section for Streamlit markdown."""
+        title = self._format_section_title(section)
+        content = self._format_section_content(section)
+        return f"**{title}**\n\n{content}"
+    
+    def create_expandable_legend(
+        self, 
+        legend: LegendContent,
+        title: str = "📖 Figure Legend",
+        expanded: bool = False
+    ) -> str:
+        """Create expandable legend content for st.expander()."""
+        sections_text = []
+        
+        # Sort sections by priority
+        sorted_sections = sorted(
+            legend.sections.items(),
+            key=lambda x: (x[1].priority, x[0].value)
+        )
+        
+        for section_type, section in sorted_sections:
+            icon = self.icon_map.get(section_type, "📋")
+            formatted_section = f"**{icon} {section.title.replace('🔬 ', '').replace('📊 ', '').replace('🎯 ', '').replace('⚙️ ', '').replace('🧮 ', '')}**\n\n{section.content}\n\n"
+            sections_text.append(formatted_section)
+        
+        return "".join(sections_text).strip()
+    
+    def create_tabbed_legend(self, legend: LegendContent) -> Dict[str, str]:
+        """Create content for st.tabs() display."""
+        tab_content = {}
+        
+        # Priority-based tab ordering
+        priority_sections = legend.get_priority_sections(max_priority=1)
+        secondary_sections = legend.get_priority_sections(max_priority=2)
+        all_sections = legend.get_priority_sections(max_priority=3)
+        
+        # Main tabs (priority 1)
+        for section_type, section in priority_sections.items():
+            clean_title = section.title.split(' ', 1)[-1]  # Remove emoji
+            tab_content[clean_title] = section.content
+        
+        # Additional tab for secondary content if present
+        if len(secondary_sections) > len(priority_sections):
+            additional_content = []
+            for section_type, section in secondary_sections.items():
+                if section_type not in priority_sections:
+                    additional_content.append(f"**{section.title}**\n\n{section.content}")
+            
+            if additional_content:
+                tab_content["Details"] = "\n\n---\n\n".join(additional_content)
+        
+        return tab_content
+    
+    def _format_section_title(self, section: LegendSection) -> str:
+        """Format section title for Streamlit."""
+        return section.title
+    
+    def _format_section_content(self, section: LegendSection) -> str:
+        """Format section content for Streamlit markdown."""
+        content = section.content
+        
+        # Enhance formulas for better Streamlit display
+        content = re.sub(r'Z = \((.*?)\)', r'**Z = (\1)**', content)
+        content = re.sub(r'r = ([\d.]+)', r'**r = \1**', content)
+        content = re.sub(r'p<([\d.]+)', r'*p* < \1', content)
+        content = re.sub(r'n=(\d+)', r'*n* = \1', content)
+        
+        # Add emphasis to key terms
+        content = re.sub(r'σE', r'**σE**', content)
+        content = re.sub(r'Cpx', r'**Cpx**', content)
+        content = re.sub(r'BREAKthrough', r'**BREAKthrough**', content)
+        content = re.sub(r'MAD', r'**MAD**', content)
+        
         return content
     
-    def _should_include_section(self, section: LegendSection, 
-                               legend_content: LegendContent) -> bool:
-        """Determine if section should be included in output."""
+    def _create_summary(self, legend: LegendContent) -> str:
+        """Create a brief summary of the legend."""
+        expertise_label = legend.expertise_level.value.title()
+        section_count = len(legend.sections)
         
-        # Check if section has content
-        if not section.content or not section.content.strip():
-            return False
-        
-        # Check expertise level compatibility
-        expertise_order = {
-            ExpertiseLevel.BASIC: 0,
-            ExpertiseLevel.INTERMEDIATE: 1,
-            ExpertiseLevel.EXPERT: 2
+        return (f"*{expertise_label} level explanation with {section_count} sections "
+                f"({legend.total_char_count} characters)*")
+
+
+class HTMLFormatter(BaseFormatter):
+    """Formatter for HTML output with CSS styling."""
+    
+    def __init__(self):
+        super().__init__(OutputFormat.HTML)
+        self.css_classes = {
+            ContentSection.BIOLOGICAL_CONTEXT: "legend-bio",
+            ContentSection.STATISTICAL_METHODS: "legend-stats",
+            ContentSection.INTERPRETATION_GUIDE: "legend-interpret",
+            ContentSection.QUALITY_CONTROL: "legend-qc",
+            ContentSection.TECHNICAL_DETAILS: "legend-tech",
+            ContentSection.REFERENCES: "legend-refs",
+            ContentSection.LIMITATIONS: "legend-limits"
         }
-        
-        section_level = expertise_order.get(section.expertise_level, 1)
-        target_level = expertise_order.get(legend_content.expertise_level, 1)
-        
-        return section_level <= target_level
-
-
-class HTMLFormatter(LegendFormatter):
-    """HTML formatter for web display."""
     
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend as HTML."""
-        
-        html_parts = ['<div class="figure-legend">']
-        
-        # Add metadata if available
-        if legend_content.metadata:
-            html_parts.append(self._format_metadata_html(legend_content.metadata))
-        
-        # Process sections
-        for section in legend_content.sections:
-            if self._should_include_section(section, legend_content):
-                html_parts.append(self._format_section_html(section))
-        
-        # Add timestamp
-        html_parts.append(f'<div class="legend-timestamp">Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}</div>')
-        
-        html_parts.append('</div>')
-        
-        return '\n'.join(html_parts)
+    def format_legend(
+        self, 
+        legend: LegendContent,
+        include_css: bool = True,
+        container_class: str = "figure-legend",
+        **kwargs
+    ) -> str:
+        """Format legend as HTML with CSS styling."""
+        try:
+            sections_html = []
+            
+            # Sort sections by priority
+            sorted_sections = sorted(
+                legend.sections.items(),
+                key=lambda x: (x[1].priority, x[0].value)
+            )
+            
+            for section_type, section in sorted_sections:
+                section_html = self.format_section(section, section_type=section_type)
+                sections_html.append(section_html)
+            
+            # Combine into complete HTML
+            legend_html = f'''
+            <div class="{container_class} expertise-{legend.expertise_level.value}">
+                <div class="legend-header">
+                    <h3>Figure Legend</h3>
+                    <span class="expertise-badge">{legend.expertise_level.value.title()} Level</span>
+                </div>
+                <div class="legend-content">
+                    {"".join(sections_html)}
+                </div>
+                <div class="legend-footer">
+                    <small>{len(legend.sections)} sections • {legend.total_char_count} characters</small>
+                </div>
+            </div>
+            '''
+            
+            if include_css:
+                css = self._get_default_css()
+                return f"<style>{css}</style>\n{legend_html}"
+            else:
+                return legend_html
+                
+        except Exception as e:
+            logger.error(f"Error formatting legend as HTML: {e}")
+            return f'<div class="error">Error formatting legend: {e}</div>'
     
-    def _format_section_html(self, section: LegendSection) -> str:
+    def format_section(self, section: LegendSection, section_type: ContentSection = None, **kwargs) -> str:
         """Format individual section as HTML."""
+        css_class = self.css_classes.get(section_type, "legend-section")
         
-        section_class = f"legend-section legend-{section.section_type.value.replace('_', '-')}"
-        
-        html_parts = [f'<div class="{section_class}">']
-        
-        # Add title
-        if section.title:
-            title_level = 'h4' if section.expertise_level == ExpertiseLevel.EXPERT else 'h5'
-            html_parts.append(f'<{title_level} class="section-title">{html.escape(section.title)}</{title_level}>')
-        
-        # Add content
-        content = html.escape(section.content)
-        
-        if section.use_bullet_points:
-            # Convert bullet points to HTML list
-            content = self._convert_bullets_to_html_list(content)
-            html_parts.append(f'<div class="section-content">{content}</div>')
+        # Extract emoji from title for separate styling
+        title_parts = section.title.split(' ', 1)
+        if len(title_parts) == 2 and title_parts[0] in ['🔬', '📊', '🎯', '⚙️', '🧮', '📚', '⚠️']:
+            emoji, title_text = title_parts
+            title_html = f'<span class="section-icon">{emoji}</span><span class="section-title">{title_text}</span>'
         else:
-            html_parts.append(f'<p class="section-content">{content}</p>')
+            title_html = section.title
         
-        # Add formulas if present
-        if section.include_formulas and '=' in section.content:
-            html_parts.append(self._extract_and_format_formulas_html(section.content))
+        # Format content with enhanced markup
+        content = self._enhance_content_markup(section.content)
         
-        html_parts.append('</div>')
-        
-        return '\n'.join(html_parts)
+        return f'''
+        <div class="{css_class}" data-priority="{section.priority}">
+            <h4 class="section-header">{title_html}</h4>
+            <div class="section-content">{content}</div>
+            <div class="section-meta">
+                <span class="char-count">{section.char_count} chars</span>
+            </div>
+        </div>
+        '''
     
-    def _convert_bullets_to_html_list(self, content: str) -> str:
-        """Convert bullet point text to HTML list."""
+    def _enhance_content_markup(self, content: str) -> str:
+        """Enhance content with HTML markup for better display."""
+        # Convert scientific notation and formulas
+        content = re.sub(r'Z = \((.*?)\)', r'<strong>Z = (\1)</strong>', content)
+        content = re.sub(r'r = ([\d.]+)', r'<strong>r = \1</strong>', content)
+        content = re.sub(r'p<([\d.]+)', r'<em>p</em> &lt; \1', content)
+        content = re.sub(r'n=(\d+)', r'<em>n</em> = \1', content)
         
-        lines = content.split('\n')
-        list_items = []
-        current_item = []
+        # Scientific terms
+        content = re.sub(r'σE', r'<strong>σE</strong>', content)
+        content = re.sub(r'Cpx', r'<strong>Cpx</strong>', content)
+        content = re.sub(r'BREAKthrough', r'<strong>BREAKthrough</strong>', content)
+        content = re.sub(r'\bMAD\b', r'<strong>MAD</strong>', content)
         
-        for line in lines:
-            line = line.strip()
-            if line.startswith('•'):
-                if current_item:
-                    list_items.append(' '.join(current_item))
-                current_item = [line[1:].strip()]  # Remove bullet
-            elif line and current_item:
-                current_item.append(line)
-            elif line and not current_item:
-                # Non-bullet text before list
-                return content  # Return original if mixed format
-        
-        if current_item:
-            list_items.append(' '.join(current_item))
-        
-        if list_items:
-            items_html = '\n'.join([f'<li>{item}</li>' for item in list_items])
-            return f'<ul class="legend-list">\n{items_html}\n</ul>'
+        # Convert line breaks
+        content = content.replace('\n', '<br>')
         
         return content
     
-    def _extract_and_format_formulas_html(self, content: str) -> str:
-        """Extract and format mathematical formulas."""
-        
-        # Simple formula detection (equations with = sign)
-        formula_pattern = r'([A-Za-z_]+\s*=\s*[^.]+)'
-        formulas = re.findall(formula_pattern, content)
-        
-        if formulas:
-            formula_html = ['<div class="formulas">']
-            for formula in formulas:
-                # Clean up formula
-                clean_formula = formula.strip().rstrip('.,')
-                formula_html.append(f'<code class="formula">{html.escape(clean_formula)}</code>')
-            formula_html.append('</div>')
-            return '\n'.join(formula_html)
-        
-        return ''
-    
-    def _format_metadata_html(self, metadata) -> str:
-        """Format metadata as HTML."""
-        
-        if not metadata:
-            return ''
-        
-        meta_parts = ['<div class="legend-metadata">']
-        
-        if metadata.chart_title:
-            meta_parts.append(f'<h3 class="chart-title">{html.escape(metadata.chart_title)}</h3>')
-        
-        # Add key metadata info
-        if metadata.data_shape:
-            rows, cols = metadata.data_shape
-            meta_parts.append(f'<div class="data-info">Data: {rows:,} wells, {cols} metrics</div>')
-        
-        if metadata.plate_ids:
-            plate_list = ', '.join(metadata.plate_ids)
-            meta_parts.append(f'<div class="plate-info">Plates: {html.escape(plate_list)}</div>')
-        
-        meta_parts.append('</div>')
-        
-        return '\n'.join(meta_parts)
-    
-    def get_css_styles(self) -> str:
-        """Get CSS styles for HTML legend formatting."""
-        
+    def _get_default_css(self) -> str:
+        """Get default CSS styles for legend display."""
         return """
-        <style>
         .figure-legend {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 14px;
-            line-height: 1.5;
-            color: #333;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 800px;
-            margin: 20px 0;
         }
         
-        .legend-metadata {
+        .legend-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .legend-header h3 {
+            margin: 0;
+            color: #495057;
+            font-size: 1.25rem;
+        }
+        
+        .expertise-badge {
+            background: #007bff;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .expertise-basic .expertise-badge { background: #28a745; }
+        .expertise-intermediate .expertise-badge { background: #ffc107; color: #212529; }
+        .expertise-expert .expertise-badge { background: #dc3545; }
+        
+        .legend-section {
             margin-bottom: 20px;
-            padding: 10px;
-            background-color: #f8f9fa;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
             border-left: 4px solid #007bff;
         }
         
-        .chart-title {
+        .legend-bio { border-left-color: #28a745; }
+        .legend-stats { border-left-color: #007bff; }
+        .legend-interpret { border-left-color: #17a2b8; }
+        .legend-qc { border-left-color: #ffc107; }
+        .legend-tech { border-left-color: #6f42c1; }
+        .legend-refs { border-left-color: #fd7e14; }
+        .legend-limits { border-left-color: #dc3545; }
+        
+        .section-header {
             margin: 0 0 10px 0;
-            color: #2c3e50;
-            font-size: 18px;
+            color: #343a40;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         
-        .data-info, .plate-info {
-            font-size: 12px;
-            color: #6c757d;
-            margin: 5px 0;
-        }
-        
-        .legend-section {
-            margin: 15px 0;
-        }
-        
-        .section-title {
-            margin: 10px 0 5px 0;
-            color: #495057;
-            font-size: 16px;
-            font-weight: 600;
+        .section-icon {
+            font-size: 1.2rem;
         }
         
         .section-content {
-            margin: 5px 0;
-            text-align: justify;
+            color: #495057;
+            line-height: 1.6;
+            margin-bottom: 10px;
         }
         
-        .legend-list {
-            margin: 10px 0;
-            padding-left: 20px;
-        }
-        
-        .legend-list li {
-            margin: 5px 0;
-        }
-        
-        .formulas {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #f1f3f4;
-            border-radius: 4px;
-        }
-        
-        .formula {
-            display: block;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            color: #1a73e8;
-            margin: 5px 0;
-            padding: 2px 4px;
-            background-color: #e8f4fd;
-            border-radius: 3px;
-        }
-        
-        .legend-timestamp {
-            font-size: 11px;
-            color: #868e96;
+        .section-meta {
             text-align: right;
+            color: #6c757d;
+            font-size: 0.8rem;
+        }
+        
+        .legend-footer {
+            text-align: center;
+            color: #6c757d;
+            font-size: 0.875rem;
             margin-top: 15px;
-            font-style: italic;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
         }
         
-        /* Chart-specific styles */
-        .legend-description {
-            border-left: 3px solid #28a745;
-            padding-left: 15px;
+        /* Priority-based opacity */
+        .legend-section[data-priority="3"] {
+            opacity: 0.85;
         }
-        
-        .legend-biological-context {
-            border-left: 3px solid #17a2b8;
-            padding-left: 15px;
-        }
-        
-        .legend-statistical-methods {
-            border-left: 3px solid #ffc107;
-            padding-left: 15px;
-        }
-        
-        .legend-interpretation {
-            border-left: 3px solid #6f42c1;
-            padding-left: 15px;
-        }
-        </style>
         """
 
 
-class PDFFormatter(LegendFormatter):
-    """PDF formatter for report generation."""
+class PDFFormatter(BaseFormatter):
+    """Formatter for PDF output with LaTeX-compatible formatting."""
     
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend for PDF output using LaTeX-style formatting."""
-        
-        parts = []
-        
-        # Add title if available
-        if legend_content.metadata and legend_content.metadata.chart_title:
-            title = legend_content.metadata.chart_title
-            parts.append(f"\\textbf{{{self._escape_latex(title)}}}")
-            parts.append("")
-        
-        # Process sections
-        for section in legend_content.sections:
-            if self._should_include_section(section, legend_content):
-                parts.append(self._format_section_pdf(section))
-        
-        return '\n\n'.join(parts)
+    def __init__(self):
+        super().__init__(OutputFormat.PDF)
+        self.section_numbering = {
+            ContentSection.BIOLOGICAL_CONTEXT: "1",
+            ContentSection.STATISTICAL_METHODS: "2",
+            ContentSection.INTERPRETATION_GUIDE: "3",
+            ContentSection.QUALITY_CONTROL: "4",
+            ContentSection.TECHNICAL_DETAILS: "5",
+            ContentSection.REFERENCES: "6",
+            ContentSection.LIMITATIONS: "7"
+        }
     
-    def _format_section_pdf(self, section: LegendSection) -> str:
-        """Format section for PDF output."""
-        
-        parts = []
-        
-        # Add section title
-        if section.title:
-            if section.expertise_level == ExpertiseLevel.EXPERT:
-                parts.append(f"\\textbf{{{self._escape_latex(section.title)}}}")
-            else:
-                parts.append(f"\\textit{{{self._escape_latex(section.title)}}}")
-        
-        # Add content
-        content = self._escape_latex(section.content)
-        
-        if section.use_bullet_points:
-            content = self._convert_bullets_to_latex_list(content)
-        
-        # Format formulas
-        if section.include_formulas:
-            content = self._format_formulas_latex(content)
-        
-        parts.append(content)
-        
-        return ' '.join(parts)
-    
-    def _convert_bullets_to_latex_list(self, content: str) -> str:
-        """Convert bullet points to LaTeX list format."""
-        
-        lines = content.split('\n')
-        list_items = []
-        
-        for line in lines:
-            line = line.strip()
-            if line.startswith('•'):
-                list_items.append(line[1:].strip())
-            elif line and not line.startswith('•'):
-                # Handle non-bullet content
-                if list_items:
-                    # End current list and add non-bullet content
-                    break
-                else:
-                    return content  # Not a proper bullet list
-        
-        if list_items:
-            items_latex = '\n'.join([f'\\item {item}' for item in list_items])
-            remaining_content = '\n'.join(lines[len(list_items):]).strip()
+    def format_legend(
+        self, 
+        legend: LegendContent,
+        include_header: bool = True,
+        figure_number: str = "1",
+        **kwargs
+    ) -> str:
+        """Format legend for PDF inclusion with LaTeX compatibility."""
+        try:
+            sections_text = []
             
-            result = f"\\begin{{itemize}}\n{items_latex}\n\\end{{itemize}}"
-            if remaining_content:
-                result += f"\n\n{remaining_content}"
-            return result
-        
-        return content
+            if include_header:
+                header = self._create_pdf_header(legend, figure_number)
+                sections_text.append(header)
+            
+            # Sort sections by priority and format
+            sorted_sections = sorted(
+                legend.sections.items(),
+                key=lambda x: (x[1].priority, self.section_numbering.get(x[0], "9"))
+            )
+            
+            for i, (section_type, section) in enumerate(sorted_sections, 1):
+                section_text = self.format_section(
+                    section, 
+                    number=str(i),
+                    section_type=section_type
+                )
+                sections_text.append(section_text)
+            
+            return "\n\n".join(sections_text)
+            
+        except Exception as e:
+            logger.error(f"Error formatting legend for PDF: {e}")
+            return f"Error formatting legend: {e}"
     
-    def _format_formulas_latex(self, content: str) -> str:
-        """Format mathematical formulas for LaTeX."""
+    def format_section(self, section: LegendSection, number: str = "", section_type: ContentSection = None, **kwargs) -> str:
+        """Format individual section for PDF."""
+        # Clean title for LaTeX (remove emojis, format properly)
+        clean_title = re.sub(r'[🔬📊🎯⚙️🧮📚⚠️]\s*', '', section.title)
         
-        # Replace formula patterns with LaTeX math mode
-        formula_pattern = r'([A-Za-z_]+)\s*=\s*([^.]+)'
+        # Format content for LaTeX compatibility
+        content = self._format_content_for_latex(section.content)
         
-        def replace_formula(match):
-            var_name = match.group(1)
-            formula = match.group(2).strip()
-            return f"${{{var_name}}} = {{{formula}}}$"
-        
-        return re.sub(formula_pattern, replace_formula, content)
+        # Create numbered subsection
+        if number:
+            return f"\\textbf{{{number}. {clean_title}}}\n\n{content}"
+        else:
+            return f"\\textbf{{{clean_title}}}\n\n{content}"
     
-    def _escape_latex(self, text: str) -> str:
-        """Escape special LaTeX characters."""
+    def _create_pdf_header(self, legend: LegendContent, figure_number: str) -> str:
+        """Create PDF header with figure information."""
+        chart_type = legend.chart_type.value.replace('_', ' ').title()
+        expertise = legend.expertise_level.value.title()
         
-        # LaTeX special characters that need escaping
-        escapes = {
-            '&': r'\&',
-            '%': r'\%',
-            '$': r'\$',
-            '#': r'\#',
-            '^': r'\textasciicircum{}',
-            '_': r'\_',
-            '{': r'\{',
-            '}': r'\}',
-            '~': r'\textasciitilde{}',
-            '\\': r'\textbackslash{}'
+        return (f"\\textbf{{Figure {figure_number} Legend: {chart_type} Analysis}} "
+                f"\\emph{{({expertise} Level Explanation)}}")
+    
+    def _format_content_for_latex(self, content: str) -> str:
+        """Format content for LaTeX compatibility."""
+        # Escape special LaTeX characters
+        latex_escapes = {
+            '#': '\\#',
+            '$': '\\$', 
+            '%': '\\%',
+            '&': '\\&',
+            '_': '\\_',
+            '{': '\\{',
+            '}': '\\}',
+            '^': '\\textasciicircum{}',
+            '~': '\\textasciitilde{}',
+            '\\': '\\textbackslash{}'
         }
         
-        for char, escape in escapes.items():
-            text = text.replace(char, escape)
+        for char, escape in latex_escapes.items():
+            content = content.replace(char, escape)
         
-        return text
+        # Format mathematical expressions
+        content = re.sub(r'Z = \((.*?)\)', r'$Z = (\1)$', content)
+        content = re.sub(r'r = ([\d.]+)', r'$r = \1$', content)
+        content = re.sub(r'p<([\d.]+)', r'$p < \1$', content)
+        content = re.sub(r'n=(\d+)', r'$n = \1$', content)
+        
+        # Format Greek letters
+        content = content.replace('σE', '$\\sigma$E')
+        content = content.replace('≥', '$\\geq$')
+        content = content.replace('≤', '$\\leq$')
+        content = content.replace('×', '$\\times$')
+        
+        # Emphasize key terms
+        content = re.sub(r'\bBREAKthrough\b', r'\\textbf{BREAKthrough}', content)
+        content = re.sub(r'\bMAD\b', r'\\textbf{MAD}', content)
+        content = re.sub(r'\bCpx\b', r'\\textbf{Cpx}', content)
+        
+        return content
 
 
-class StreamlitFormatter(LegendFormatter):
-    """Streamlit formatter for interactive web apps."""
+class PlainTextFormatter(BaseFormatter):
+    """Formatter for plain text output."""
     
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend for Streamlit display using markdown."""
-        
-        parts = []
-        
-        # Add title
-        if legend_content.metadata and legend_content.metadata.chart_title:
-            title = legend_content.metadata.chart_title
-            parts.append(f"### {title}")
-            parts.append("")
-        
-        # Add metadata info box
-        if legend_content.metadata:
-            info_box = self._create_streamlit_info_box(legend_content.metadata)
-            if info_box:
-                parts.append(info_box)
-                parts.append("")
-        
-        # Process sections
-        for section in legend_content.sections:
-            if self._should_include_section(section, legend_content):
-                parts.append(self._format_section_streamlit(section))
-        
-        # Add collapsible technical details for expert level
-        if legend_content.expertise_level == ExpertiseLevel.EXPERT:
-            technical_sections = [s for s in legend_content.sections 
-                                if s.section_type.value in ['methodology', 'limitations']]
-            if technical_sections:
-                parts.append(self._create_expandable_section(technical_sections))
-        
-        return '\n\n'.join(parts)
+    def __init__(self):
+        super().__init__(OutputFormat.PLAIN_TEXT)
     
-    def _format_section_streamlit(self, section: LegendSection) -> str:
-        """Format section for Streamlit markdown."""
+    def format_legend(self, legend: LegendContent, width: int = 80, **kwargs) -> str:
+        """Format legend as plain text with specified line width."""
+        try:
+            lines = []
+            
+            # Header
+            title = f"FIGURE LEGEND ({legend.expertise_level.value.upper()} LEVEL)"
+            lines.append("=" * width)
+            lines.append(title.center(width))
+            lines.append("=" * width)
+            lines.append("")
+            
+            # Sections
+            sorted_sections = sorted(
+                legend.sections.items(),
+                key=lambda x: (x[1].priority, x[0].value)
+            )
+            
+            for i, (section_type, section) in enumerate(sorted_sections, 1):
+                section_text = self.format_section(section, number=i, width=width)
+                lines.append(section_text)
+                lines.append("")  # Blank line between sections
+            
+            # Footer
+            lines.append("-" * width)
+            lines.append(f"Total: {len(legend.sections)} sections, {legend.total_char_count} characters".center(width))
+            
+            return "\n".join(lines)
+            
+        except Exception as e:
+            logger.error(f"Error formatting legend as plain text: {e}")
+            return f"Error formatting legend: {e}"
+    
+    def format_section(self, section: LegendSection, number: int = None, width: int = 80, **kwargs) -> str:
+        """Format individual section as plain text."""
+        # Clean title
+        clean_title = re.sub(r'[🔬📊🎯⚙️🧮📚⚠️]\s*', '', section.title).upper()
         
-        parts = []
+        # Section header
+        if number:
+            header = f"{number}. {clean_title}"
+        else:
+            header = clean_title
+            
+        lines = [header, "-" * len(header)]
         
-        # Section title with appropriate header level
-        if section.title:
-            if section.expertise_level == ExpertiseLevel.EXPERT:
-                parts.append(f"#### {section.title}")
+        # Wrap content to specified width
+        content = section.content
+        words = content.split()
+        current_line = []
+        current_length = 0
+        
+        for word in words:
+            if current_length + len(word) + 1 > width:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                    current_length = len(word)
+                else:
+                    lines.append(word)  # Word is longer than width
             else:
-                parts.append(f"**{section.title}**")
+                current_line.append(word)
+                current_length += len(word) + (1 if current_line else 0)
         
-        # Content
-        content = section.content
+        if current_line:
+            lines.append(" ".join(current_line))
         
-        if section.use_bullet_points:
-            content = self._format_bullets_for_markdown(content)
-        
-        # Highlight formulas
-        if section.include_formulas:
-            content = self._highlight_formulas_markdown(content)
-        
-        parts.append(content)
-        
-        return '\n'.join(parts)
-    
-    def _create_streamlit_info_box(self, metadata) -> str:
-        """Create Streamlit info box with metadata."""
-        
-        if not metadata:
-            return ""
-        
-        info_parts = []
-        
-        if metadata.data_shape:
-            rows, cols = metadata.data_shape
-            info_parts.append(f"📊 **Data:** {rows:,} wells, {cols} metrics")
-        
-        if metadata.plate_ids and len(metadata.plate_ids) > 0:
-            plate_info = f"🧫 **Plates:** {len(metadata.plate_ids)} ({', '.join(metadata.plate_ids[:3])}{'...' if len(metadata.plate_ids) > 3 else ''})"
-            info_parts.append(plate_info)
-        
-        if metadata.primary_metrics:
-            metrics = ', '.join(metadata.primary_metrics[:3])
-            if len(metadata.primary_metrics) > 3:
-                metrics += f" (and {len(metadata.primary_metrics) - 3} more)"
-            info_parts.append(f"📈 **Metrics:** {metrics}")
-        
-        if info_parts:
-            return f"> {' | '.join(info_parts)}"
-        
-        return ""
-    
-    def _format_bullets_for_markdown(self, content: str) -> str:
-        """Format bullet points for markdown."""
-        
-        lines = content.split('\n')
-        formatted_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            if line.startswith('•'):
-                # Convert to markdown bullet
-                formatted_lines.append(f"- {line[1:].strip()}")
-            elif line:
-                formatted_lines.append(line)
-        
-        return '\n'.join(formatted_lines)
-    
-    def _highlight_formulas_markdown(self, content: str) -> str:
-        """Highlight formulas in markdown."""
-        
-        # Wrap formulas in code blocks
-        formula_pattern = r'([A-Za-z_]+\s*=\s*[^.]+)'
-        
-        def highlight_formula(match):
-            formula = match.group(1).strip().rstrip('.,')
-            return f"`{formula}`"
-        
-        return re.sub(formula_pattern, highlight_formula, content)
-    
-    def _create_expandable_section(self, sections: List[LegendSection]) -> str:
-        """Create expandable section for technical details."""
-        
-        if not sections:
-            return ""
-        
-        content_parts = []
-        for section in sections:
-            content_parts.append(f"**{section.title}**")
-            content_parts.append(section.content)
-            content_parts.append("")
-        
-        # This would be used with streamlit.expander in the actual app
-        return f"""
----
-**🔬 Technical Details** *(Click to expand)*
-
-{chr(10).join(content_parts)}
-"""
+        return "\n".join(lines)
 
 
-class MarkdownFormatter(LegendFormatter):
-    """Plain Markdown formatter for documentation."""
+class MarkdownFormatter(BaseFormatter):
+    """Formatter for Markdown output."""
     
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend as plain markdown."""
-        
-        parts = []
-        
-        # Title
-        if legend_content.metadata and legend_content.metadata.chart_title:
-            parts.append(f"# {legend_content.metadata.chart_title}")
-            parts.append("")
-        
-        # Process sections
-        for section in legend_content.sections:
-            if self._should_include_section(section, legend_content):
-                parts.append(self._format_section_markdown(section))
-        
-        return '\n\n'.join(parts)
+    def __init__(self):
+        super().__init__(OutputFormat.MARKDOWN)
     
-    def _format_section_markdown(self, section: LegendSection) -> str:
-        """Format section as markdown."""
-        
-        parts = []
-        
-        if section.title:
-            parts.append(f"## {section.title}")
-        
-        content = section.content
-        
-        if section.use_bullet_points:
-            # Ensure proper bullet formatting
-            lines = content.split('\n')
-            formatted_lines = []
+    def format_legend(self, legend: LegendContent, **kwargs) -> str:
+        """Format legend as Markdown."""
+        try:
+            lines = []
             
-            for line in lines:
-                line = line.strip()
-                if line.startswith('•'):
-                    formatted_lines.append(f"- {line[1:].strip()}")
-                elif line:
-                    formatted_lines.append(line)
+            # Header
+            lines.append(f"# Figure Legend")
+            lines.append(f"*{legend.expertise_level.value.title()} Level • {legend.chart_type.value.replace('_', ' ').title()}*")
+            lines.append("")
             
-            content = '\n'.join(formatted_lines)
-        
-        parts.append(content)
-        
-        return '\n'.join(parts)
-
-
-class PlainTextFormatter(LegendFormatter):
-    """Plain text formatter for simple output."""
+            # Sections
+            sorted_sections = sorted(
+                legend.sections.items(),
+                key=lambda x: (x[1].priority, x[0].value)
+            )
+            
+            for section_type, section in sorted_sections:
+                section_md = self.format_section(section)
+                lines.append(section_md)
+                lines.append("")
+            
+            # Footer
+            lines.append("---")
+            lines.append(f"*{len(legend.sections)} sections • {legend.total_char_count} characters*")
+            
+            return "\n".join(lines)
+            
+        except Exception as e:
+            logger.error(f"Error formatting legend as Markdown: {e}")
+            return f"**Error formatting legend:** {e}"
     
-    def format(self, legend_content: LegendContent) -> str:
-        """Format legend as plain text."""
-        
-        parts = []
-        
-        # Title
-        if legend_content.metadata and legend_content.metadata.chart_title:
-            title = legend_content.metadata.chart_title
-            parts.append(title)
-            parts.append("=" * len(title))
-            parts.append("")
-        
-        # Process sections
-        for section in legend_content.sections:
-            if self._should_include_section(section, legend_content):
-                parts.append(self._format_section_text(section))
-        
-        return '\n\n'.join(parts)
-    
-    def _format_section_text(self, section: LegendSection) -> str:
-        """Format section as plain text."""
-        
-        parts = []
-        
-        if section.title:
-            parts.append(section.title.upper())
-            parts.append("-" * len(section.title))
-        
-        # Clean up content
+    def format_section(self, section: LegendSection, **kwargs) -> str:
+        """Format individual section as Markdown."""
+        # Use title as-is (includes emoji)
+        title = section.title
         content = section.content
         
-        # Remove HTML/markdown formatting
-        content = re.sub(r'<[^>]+>', '', content)  # Remove HTML tags
-        content = re.sub(r'\*\*(.*?)\*\*', r'\1', content)  # Remove bold markdown
-        content = re.sub(r'\*(.*?)\*', r'\1', content)  # Remove italic markdown
+        # Enhance content formatting
+        content = re.sub(r'Z = \((.*?)\)', r'**Z = (\1)**', content)
+        content = re.sub(r'r = ([\d.]+)', r'**r = \1**', content) 
+        content = re.sub(r'p<([\d.]+)', r'*p* < \1', content)
+        content = re.sub(r'n=(\d+)', r'*n* = \1', content)
         
-        parts.append(content)
+        # Scientific terms
+        content = re.sub(r'σE', r'**σE**', content)
+        content = re.sub(r'Cpx', r'**Cpx**', content)
+        content = re.sub(r'BREAKthrough', r'**BREAKthrough**', content)
+        content = re.sub(r'\bMAD\b', r'**MAD**', content)
         
-        return '\n'.join(parts)
+        return f"## {title}\n\n{content}"
 
 
-class FormatterFactory:
-    """Factory for creating appropriate formatters."""
-    
-    _formatters = {
+# Formatter factory function
+def get_formatter(output_format: OutputFormat) -> BaseFormatter:
+    """Get appropriate formatter for output format."""
+    formatters = {
+        OutputFormat.STREAMLIT: StreamlitFormatter,
         OutputFormat.HTML: HTMLFormatter,
         OutputFormat.PDF: PDFFormatter,
-        OutputFormat.STREAMLIT: StreamlitFormatter,
-        OutputFormat.MARKDOWN: MarkdownFormatter,
-        OutputFormat.PLAIN_TEXT: PlainTextFormatter
+        OutputFormat.PLAIN_TEXT: PlainTextFormatter,
+        OutputFormat.MARKDOWN: MarkdownFormatter
     }
     
-    @classmethod
-    def get_formatter(cls, output_format: OutputFormat, 
-                     config: Optional[Dict[str, Any]] = None) -> LegendFormatter:
-        """Get appropriate formatter for output format."""
-        
-        formatter_class = cls._formatters.get(output_format, PlainTextFormatter)
-        return formatter_class(config)
+    formatter_class = formatters.get(output_format)
+    if not formatter_class:
+        raise ValueError(f"No formatter available for output format: {output_format}")
     
-    @classmethod
-    def register_formatter(cls, output_format: OutputFormat, 
-                          formatter_class: type):
-        """Register custom formatter."""
-        cls._formatters[output_format] = formatter_class
-    
-    @classmethod
-    def list_supported_formats(cls) -> List[OutputFormat]:
-        """List all supported output formats."""
-        return list(cls._formatters.keys())
+    return formatter_class()

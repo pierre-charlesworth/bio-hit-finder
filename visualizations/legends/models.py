@@ -85,10 +85,15 @@ class TechnicalContext:
     detection_method: str = "luminescence"
     normalization_method: str = "BG_BT_ratio"
     processing_software: str = "bio-hit-finder"
-    quality_metrics: Dict[str, float]
+    quality_metrics: Dict[str, float] = None
     edge_effects_detected: bool = False
     b_scoring_applied: bool = False
     viability_threshold: float = 0.3
+    
+    def __post_init__(self):
+        """Initialize empty quality_metrics dict if None provided."""
+        if self.quality_metrics is None:
+            self.quality_metrics = {}
 
 
 @dataclass
