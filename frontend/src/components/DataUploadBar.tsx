@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +16,11 @@ import {
   ChevronDown,
   Settings,
   Play,
-  Database
+  Database,
+  Info,
+  FlaskConical,
+  Activity,
+  Target
 } from 'lucide-react';
 import { api } from '@/lib/api';
 
@@ -28,6 +33,7 @@ interface DataUploadBarProps {
 const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChange }: DataUploadBarProps) => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isParametersExpanded, setIsParametersExpanded] = useState(false);
+  const [isDataFormatExpanded, setIsDataFormatExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [useSampleData, setUseSampleData] = useState(false);
   
@@ -175,8 +181,18 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
             />
           </div>
 
-          {/* Right Side - Parameters Button */}
-          <div className="flex items-center">
+          {/* Right Side - Action Buttons */}
+          <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="gap-1 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsDataFormatExpanded(!isDataFormatExpanded)}
+            >
+              <Info className="h-3 w-3" />
+              Data Format
+              <ChevronDown className={`h-3 w-3 transition-transform ${isDataFormatExpanded ? 'rotate-180' : ''}`} />
+            </Button>
             <Button 
               size="sm" 
               variant="outline" 
@@ -189,6 +205,170 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
             </Button>
           </div>
         </div>
+
+        {/* Expandable Data Format Panel */}
+        <Collapsible open={isDataFormatExpanded} onOpenChange={setIsDataFormatExpanded}>
+          <CollapsibleContent>
+            <div className="border-t bg-muted/30 px-6 py-4">
+              <div className="mb-4">
+                <h3 className="font-medium text-sm mb-3 flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-blue-600" />
+                  Required CSV Data Format
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Your CSV file must contain the following columns for proper plate analysis. Each measurement type serves a specific biological purpose in the screening assay.
+                </p>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-4">
+                {/* Reporter Assay Columns */}
+                <Card className="border-blue-200 dark:border-blue-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-blue-600" />
+                      Reporter Assays
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      β-galactosidase activity and cell density measurements
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">BG_lptA</Badge>
+                        <Badge variant="outline" className="text-xs font-mono">BT_lptA</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>lptA reporter:</strong> BetaGlo signal (BG) measures β-galactosidase activity from the lptA promoter. BacTiter signal (BT) normalizes for cell density. The BG/BT ratio indicates lptA expression levels.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">BG_ldtD</Badge>
+                        <Badge variant="outline" className="text-xs font-mono">BT_ldtD</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>ldtD reporter:</strong> Similar dual-reporter system for ldtD promoter activity. Both reporters help identify compounds affecting envelope stress response pathways.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-950/30 rounded border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-800 dark:text-blue-200 font-medium">
+                        💡 Ratio Calculation: Reporter_Ratio = BG / BT
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Growth Inhibition Columns */}
+                <Card className="border-green-200 dark:border-green-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Target className="h-4 w-4 text-green-600" />
+                      Growth Measurements
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Optical density readings for bacterial strain viability
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">OD_WT</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Wild-type strain:</strong> Baseline growth measurement for the parent bacterial strain without genetic modifications.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">OD_tolC</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>tolC knockout:</strong> Strain lacking the TolC efflux pump component, increasing sensitivity to many compounds.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">OD_SA</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Sensitized strain:</strong> Additional genetic background with enhanced compound sensitivity for hit detection.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 p-2 bg-green-50 dark:bg-green-950/30 rounded border border-green-200 dark:border-green-800">
+                      <p className="text-xs text-green-800 dark:text-green-200 font-medium">
+                        🎯 Three-strain screening increases hit detection sensitivity
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Identifier Columns */}
+                <Card className="border-orange-200 dark:border-orange-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Database className="h-4 w-4 text-orange-600" />
+                      Identifiers
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Plate position and compound tracking
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">Well_ID</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Plate position:</strong> Standard well identifiers (e.g., A01, B12, H24) for 96-, 384-, or 1536-well plates.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-mono">Compound_ID</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <strong>Chemical identifier:</strong> Unique compound codes, catalog numbers, or chemical names for tracking test substances.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Example Format */}
+                <Card className="border-purple-200 dark:border-purple-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-purple-600" />
+                      Example Format
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Sample CSV structure with proper headers
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded border font-mono text-xs overflow-x-auto">
+                      <div className="text-purple-600 dark:text-purple-400 mb-2">CSV Header Row:</div>
+                      <div className="whitespace-nowrap">
+                        Well_ID,Compound_ID,BG_lptA,BT_lptA,BG_ldtD,BT_ldtD,OD_WT,OD_tolC,OD_SA
+                      </div>
+                      <div className="text-purple-600 dark:text-purple-400 mt-2 mb-1">Sample Data:</div>
+                      <div className="whitespace-nowrap text-muted-foreground">
+                        A01,DMSO_CTL,1250,850,980,820,0.85,0.82,0.79<br/>
+                        A02,CPD_001,890,825,1450,815,0.81,0.45,0.38
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Expandable Parameters Panel */}
         <Collapsible open={isParametersExpanded} onOpenChange={setIsParametersExpanded}>

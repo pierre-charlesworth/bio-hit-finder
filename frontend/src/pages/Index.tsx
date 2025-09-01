@@ -2,8 +2,13 @@ import { useState } from 'react';
 import Header from '@/components/Header';
 import DataUploadBar from '@/components/DataUploadBar';
 import Hero from '@/components/Hero';
+import WhyItMatters from '@/components/WhyItMatters';
+import ScreeningWorkflow from '@/components/ScreeningWorkflow';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import WorkGrid from '@/components/WorkGrid';
+import QCLearningModule from '@/components/QCLearningModule';
+import PlatformValidation from '@/components/PlatformValidation';
+import ExpertCommentary from '@/components/ExpertCommentary';
 import About from '@/components/About';
 import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
@@ -33,8 +38,13 @@ const Index = () => {
       />
       <main>
         <Hero />
+        <WhyItMatters />
+        <ScreeningWorkflow />
         <AnalysisDashboard />
         <WorkGrid />
+        <QCLearningModule />
+        <PlatformValidation />
+        <ExpertCommentary />
         <About />
         <Contact />
       </main>
