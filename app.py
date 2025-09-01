@@ -1252,19 +1252,6 @@ def main() -> None:
         with methodology_container:
             st.markdown("### 🔬 Scientific Methodology")
             
-            method_col1, method_col2 = st.columns([1, 5])
-            with method_col1:
-                st.markdown("**Platform:**")
-                st.markdown("**Approach:**") 
-                st.markdown("**Statistics:**")
-                st.markdown("**Quality:**")
-            
-            with method_col2:
-                st.markdown("**BREAKthrough OM** - Dual-readout antimicrobial discovery targeting Gram-negative outer membrane")
-                st.markdown("**σE/Cpx stress monitoring** - lptA + ldtD reporters detect envelope disruption via orthogonal pathways")
-                st.markdown("**Robust Z-scores** - Median/MAD normalization resistant to outliers, optimized for screening")  
-                st.markdown("**ATP viability gating** - Excludes cytotoxic artifacts, focuses on viable stress responses")
-            
             with st.expander("📖 **Detailed Scientific Background**", expanded=True):
                 method_tabs = st.tabs(["🔬 Platform Overview", "🧬 Biological Foundation", "📊 Statistical Methods", "✅ Quality Control"])
                 
