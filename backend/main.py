@@ -199,6 +199,20 @@ async def analyze_demo_data(config: Optional[Dict[str, Any]] = None):
         # Convert to JSON-serializable format
         results = results_df.to_dict(orient='records')
         
+        # Convert numpy types to Python native types for JSON serialization
+        def convert_numpy_types(obj):
+            if isinstance(obj, dict):
+                return {k: convert_numpy_types(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            elif hasattr(obj, 'item'):  # numpy scalar
+                return obj.item()
+            else:
+                return obj
+        
+        summary = convert_numpy_types(summary)
+        results = convert_numpy_types(results)
+        
         return {
             "success": True,
             "results": results,

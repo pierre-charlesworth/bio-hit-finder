@@ -78,9 +78,12 @@ class VitalityAnalyzer:
             raise VitalityError(f"Missing required OD columns: {missing_cols}")
             
         # Use only experimental data (exclude summary rows if present)
-        experimental_data = df[df.get('Well_Type', 'experimental') == 'experimental'].copy()
-        if experimental_data.empty:
-            experimental_data = df.copy()  # Fallback if no Well_Type column
+        if 'Well_Type' in df.columns:
+            experimental_data = df[df['Well_Type'] == 'experimental'].copy()
+            if experimental_data.empty:
+                experimental_data = df.copy()  # Fallback if no experimental data found
+        else:
+            experimental_data = df.copy()  # No Well_Type column, use all data
             
         # Calculate medians, handling NaN values
         medians = {}
