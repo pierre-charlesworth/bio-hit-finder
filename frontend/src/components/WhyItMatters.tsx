@@ -13,7 +13,7 @@ const WhyItMatters = () => {
     },
     {
       icon: Shield,
-      value: ">90%",
+      value: "&gt;90%",
       label: "Potential antibiotics blocked by outer membrane",
       trend: "Major barrier to discovery"
     },

@@ -30,7 +30,7 @@ const WorkGrid = () => {
       category: '⚡ HTS Platform',
       description: '384-well plates with synchronized protocols manage environmental factors. OD measurements reveal growth inhibition patterns. BetaGlo/BacTiter chemistry provides ATP-normalized reporter activity.',
       details: [
-        'Expected OM permeabilizers: WT>80%, ΔtolC≤80%, SA>80%',
+        'Expected OM permeabilizers: WT&gt;80%, ΔtolC≤80%, SA&gt;80%',
         'Environmental control for temperature, humidity, evaporation',
         'Time-course measurements with synchronized protocols'
       ]

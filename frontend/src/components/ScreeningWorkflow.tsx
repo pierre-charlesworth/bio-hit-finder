@@ -30,9 +30,9 @@ const ScreeningWorkflow = () => {
       icon: BarChart3,
       description: "Three-strain growth analysis confirms outer membrane-specific activity patterns",
       criteria: [
-        "E. coli WT: >80% growth (protected by intact OM)",
+        "E. coli WT: &gt;80% growth (protected by intact OM)",
         "E. coli ΔtolC: ≤80% growth (sensitized strain)",
-        "S. aureus: >80% growth (no OM target)"
+        "S. aureus: &gt;80% growth (no OM target)"
       ],
       hitRate: "~6.5%",
       hitCount: "57/880", 
@@ -80,7 +80,7 @@ const ScreeningWorkflow = () => {
     },
     {
       metric: "Reproducibility",
-      value: ">90%",
+      value: "&gt;90%",
       description: "Cross-plate validation",
       tooltip: "MAD"
     }

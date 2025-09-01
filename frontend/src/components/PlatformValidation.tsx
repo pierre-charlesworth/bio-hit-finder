@@ -184,7 +184,7 @@ const PlatformValidation = () => {
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>• <ScientificTooltip term="Z'-factor">Z'-factor</ScientificTooltip> consistently ≥0.7 across all assay plates</li>
                 <li>• <ScientificTooltip term="B-scoring">B-score correction</ScientificTooltip> eliminates systematic spatial artifacts</li>
-                <li>• Hit validation success rate >85% in secondary dose-response assays</li>
+                <li>• Hit validation success rate &gt;85% in secondary dose-response assays</li>
                 <li>• Cross-platform compatibility with standard 384-well HTS infrastructure</li>
               </ul>
             </div>
