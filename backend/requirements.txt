@@ -9,8 +9,8 @@ pandas==2.2.3
 # Phase 2.2: Add numpy explicitly (pandas dependency, but explicit version)
 numpy>=1.24.0,<1.27.0
 
-# Temporarily removed for later phases:
-# plotly - pure Python, will be added next
+# Phase 2.3: Add plotly (pure Python, no compilation needed)
+plotly>=5.17.0
 # scipy - large dependency (Phase 2.3)
 # openpyxl - file processing (Phase 2.4)
 # pyyaml - config loading (Phase 2.4)
