@@ -1265,7 +1265,7 @@ def main() -> None:
                 st.markdown("**Robust Z-scores** - Median/MAD normalization resistant to outliers, optimized for screening")  
                 st.markdown("**ATP viability gating** - Excludes cytotoxic artifacts, focuses on viable stress responses")
             
-            with st.expander("📖 **Detailed Scientific Background**", expanded=False):
+            with st.expander("📖 **Detailed Scientific Background**", expanded=True):
                 method_tabs = st.tabs(["🔬 Platform Overview", "🧬 Biological Foundation", "📊 Statistical Methods", "✅ Quality Control"])
                 
                 with method_tabs[0]:
