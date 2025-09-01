@@ -1,6 +1,6 @@
 import Header from '@/components/Header';
+import DataUploadBar from '@/components/DataUploadBar';
 import Hero from '@/components/Hero';
-import DataUpload from '@/components/DataUpload';
 import AnalysisDashboard from '@/components/AnalysisDashboard';
 import WorkGrid from '@/components/WorkGrid';
 import About from '@/components/About';
@@ -11,9 +11,9 @@ const Index = () => {
   return (
     <div className="min-h-screen">
       <Header />
+      <DataUploadBar />
       <main>
         <Hero />
-        <DataUpload />
         <AnalysisDashboard />
         <WorkGrid />
         <About />
