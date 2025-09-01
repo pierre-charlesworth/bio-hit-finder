@@ -56,12 +56,54 @@ export const api = {
     return response.json();
   },
 
-  // Analysis endpoints (to be implemented)
-  getAnalysisSummary: (jobId: string) =>
-    apiRequest<any>(`/v1/analysis/${jobId}/summary`),
+  // Multi-stage analysis endpoints
+  analyzeMultiStage: async (file: File, config?: any) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (config) {
+      formData.append('config', JSON.stringify(config));
+    }
     
-  getHeatmapData: (jobId: string, metric: string) =>
-    apiRequest<any>(`/v1/analysis/${jobId}/heatmap/${metric}`),
+    const response = await fetch(`${API_BASE_URL}/v1/analyze/multi-stage`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Multi-stage analysis failed');
+    }
+    
+    return response.json();
+  },
+
+  analyzeVitality: async (file: File, config?: any) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (config) {
+      formData.append('config', JSON.stringify(config));
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/v1/analyze/vitality`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Vitality analysis failed');
+    }
+    
+    return response.json();
+  },
+
+  getDemoAnalysis: async (config?: any) => {
+    return apiRequest<any>('/v1/analyze/demo', {
+      method: 'POST',
+      body: config ? JSON.stringify(config) : undefined,
+    });
+  },
+
+  getMultiStageDefaults: () =>
+    apiRequest<any>('/v1/config/multi-stage-defaults'),
 };
 
 export type { ApiError };
