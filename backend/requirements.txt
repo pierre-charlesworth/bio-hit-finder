@@ -1,27 +1,15 @@
-# FastAPI and web server
+# Minimal FastAPI setup for Phase 1 deployment
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
-# Core data processing (Python 3.11 compatible)
-pandas>=2.0.0,<2.2.0
-numpy>=1.24.0,<1.26.0
-plotly>=5.17.0
-scipy>=1.11.0,<1.12.0
-openpyxl>=3.1.0
-pyyaml>=6.0.0
+# Only essential dependencies (with pre-built wheels)
+pydantic==2.5.0
 
-# Polars (optional, for performance)
-polars>=0.20.0; python_version >= "3.8"
-
-# Export functionality (simplified for now)
-# weasyprint==60.2  # Temporarily disabled - complex build
-
-# Additional FastAPI dependencies
-pydantic>=2.5.0
-python-jose>=3.3.0
-passlib>=1.7.4
-
-# Background processing (for future use)
-# celery==5.3.4     # Temporarily disabled
-# redis==5.0.1      # Temporarily disabled
+# Temporarily removed for initial deployment:
+# pandas - causing Python 3.13 compilation issues
+# numpy - dependency of pandas  
+# plotly - can be added back later
+# scipy - large dependency
+# openpyxl - file processing (Phase 2)
+# pyyaml - config loading (Phase 2)
