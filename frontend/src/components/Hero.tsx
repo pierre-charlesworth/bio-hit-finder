@@ -1,10 +1,33 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowRight, Circle } from 'lucide-react';
-import { useApiTest } from '@/hooks/useApi';
+import { useApiTest, useDemoAnalysis } from '@/hooks/useApi';
+import { useToast } from '@/hooks/use-toast';
 
 const Hero = () => {
   const { data: apiTest, isLoading, isError } = useApiTest();
+  const { toast } = useToast();
+  const demoMutation = useDemoAnalysis();
+
+  const handleDemoClick = () => {
+    demoMutation.mutate({}, {
+      onSuccess: (data) => {
+        console.log('Demo analysis completed:', data);
+        toast({
+          title: "Demo Analysis Complete",
+          description: `Found ${data.summary?.stage3_platform_hits || 0} platform hits out of ${data.total_wells} wells`,
+        });
+      },
+      onError: (error) => {
+        console.error('Demo analysis failed:', error);
+        toast({
+          title: "Demo Analysis Failed",
+          description: "There was an error running the demo analysis",
+          variant: "destructive",
+        });
+      }
+    });
+  };
 
   return (
     <section className="min-h-screen flex items-center justify-center pt-16">
@@ -65,8 +88,10 @@ const Hero = () => {
               variant="outline" 
               size="lg"
               className="hover-lift"
+              onClick={handleDemoClick}
+              disabled={demoMutation.isPending}
             >
-              View Demo
+              {demoMutation.isPending ? 'Loading Demo...' : 'View Demo'}
             </Button>
           </div>
         </div>
