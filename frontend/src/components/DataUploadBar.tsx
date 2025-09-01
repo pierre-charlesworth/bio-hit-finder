@@ -112,18 +112,18 @@ const DataUploadBar = () => {
           {/* Left Side - Upload Area and Sample Data Toggle */}
           <div className="flex items-center gap-4">
             <div
-              className={`relative h-12 w-12 border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200 ${
-                isDragOver 
-                  ? 'border-primary bg-primary/10' 
+              className={`relative h-12 w-12 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                useSampleData
+                  ? 'border-muted bg-muted/20 cursor-not-allowed opacity-50'
+                  : isDragOver 
+                  ? 'border-primary bg-primary/10 cursor-pointer' 
                   : uploadedFile
-                  ? 'border-green-500 bg-green-50 dark:bg-green-950'
-                  : useSampleData
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                  : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                  ? 'border-green-500 bg-green-50 dark:bg-green-950 cursor-pointer'
+                  : 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'
               }`}
-              onDrop={handleDrop}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
+              onDrop={useSampleData ? undefined : handleDrop}
+              onDragOver={useSampleData ? undefined : handleDragOver}
+              onDragLeave={useSampleData ? undefined : handleDragLeave}
             >
               <input
                 type="file"
@@ -143,24 +143,23 @@ const DataUploadBar = () => {
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 ) : uploadMutation.isError ? (
                   <AlertCircle className="h-5 w-5 text-red-500" />
-                ) : useSampleData ? (
-                  <Database className="h-5 w-5 text-blue-600" />
                 ) : (
-                  <Upload className="h-5 w-5 text-muted-foreground" />
+                  <Upload className={`h-5 w-5 ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} />
                 )}
               </label>
             </div>
 
             {/* Sample Data Toggle */}
-            <Button
-              size="sm"
-              variant={useSampleData ? "default" : "outline"}
-              className="gap-1 h-12 px-3"
-              onClick={handleSampleDataToggle}
-            >
-              <Database className="h-4 w-4" />
-              {useSampleData ? 'Using Sample' : 'Sample Data'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="sample-data-toggle" className="text-sm font-medium">
+                Sample Data
+              </Label>
+              <Switch
+                id="sample-data-toggle"
+                checked={useSampleData}
+                onCheckedChange={handleSampleDataToggle}
+              />
+            </div>
             
             {/* File Info */}
             <div className="flex items-center gap-3">
@@ -174,20 +173,13 @@ const DataUploadBar = () => {
                   </div>
                   {getStatusBadge()}
                 </div>
-              ) : useSampleData ? (
+              ) : (
                 <div className="flex items-center gap-2">
-                  <div className="text-sm">
-                    <p className="font-medium">Sample Screening Data</p>
-                    <p className="text-xs text-muted-foreground">
-                      384-well plate, 2000 compounds
-                    </p>
+                  <div className={`text-sm ${useSampleData ? 'text-muted-foreground/70' : 'text-muted-foreground'}`}>
+                    <p>{useSampleData ? 'Sample data selected' : 'Drop CSV file or click to upload'}</p>
+                    <p className="text-xs">{useSampleData ? 'Toggle off to upload files' : 'Max 50MB'}</p>
                   </div>
                   {getStatusBadge()}
-                </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  <p>Drop CSV file or click to upload</p>
-                  <p className="text-xs">Max 50MB</p>
                 </div>
               )}
             </div>
@@ -293,14 +285,29 @@ const DataUploadBar = () => {
                   </div>
                 </div>
 
-                {/* Output Options */}
+                {/* Data Source & Output Options */}
                 <div className="space-y-4">
-                  <h3 className="font-medium text-sm">Output Options</h3>
+                  <h3 className="font-medium text-sm">Data Source & Options</h3>
                   <div className="space-y-3">
-                    <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                      <FileText className="h-3 w-3" />
-                      Download Template
-                    </Button>
+                    {useSampleData ? (
+                      <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Database className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium text-blue-900 dark:text-blue-100">Sample Dataset</span>
+                        </div>
+                        <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                          <p>• 384-well screening plate</p>
+                          <p>• 2,000 test compounds</p>
+                          <p>• Complete BG/BT and OD measurements</p>
+                          <p>• Realistic noise and edge effects</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                        <FileText className="h-3 w-3" />
+                        Download Template
+                      </Button>
+                    )}
                     
                     <div className="text-xs text-muted-foreground space-y-1">
                       <p className="font-medium">Required columns:</p>
