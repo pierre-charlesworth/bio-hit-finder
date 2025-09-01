@@ -1,12 +1,10 @@
-# Minimal FastAPI setup for Phase 1 deployment
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+# Ultra-minimal FastAPI setup for Render deployment
+fastapi==0.100.0
+uvicorn==0.23.0
 python-multipart==0.0.6
 
-# Only essential dependencies (with pre-built wheels)
-pydantic==2.5.0
-
 # Temporarily removed for initial deployment:
+# pydantic - causing compilation issues, using FastAPI's built-in
 # pandas - causing Python 3.13 compilation issues
 # numpy - dependency of pandas  
 # plotly - can be added back later
