@@ -13,8 +13,8 @@ import pandas as pd
 import io
 import json
 
-from .core.plate_processor import PlateProcessor
-from .analytics import (
+from core.plate_processor import PlateProcessor
+from analytics import (
     MultiStageHitCaller, 
     MultiStageConfig, 
     VitalityConfig,
@@ -140,7 +140,7 @@ async def analyze_vitality_only(file: UploadFile = File(...), config: Optional[s
             raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV or Excel files.")
         
         # Run vitality-only analysis
-        from .analytics import VitalityAnalyzer
+        from analytics import VitalityAnalyzer
         analyzer = VitalityAnalyzer(vitality_config)
         
         result_df = analyzer.detect_vitality_hits(df)
@@ -264,7 +264,7 @@ def _generate_demo_dual_readout_data() -> pd.DataFrame:
     })
     
     # Calculate Z-scores for reporter ratios
-    from .core.statistics import calculate_robust_zscore
+    from core.statistics import calculate_robust_zscore
     demo_df['Z_lptA'] = calculate_robust_zscore(demo_df['Ratio_lptA'])
     demo_df['Z_ldtD'] = calculate_robust_zscore(demo_df['Ratio_ldtD'])
     

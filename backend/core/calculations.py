@@ -638,7 +638,7 @@ def process_multi_stage_hit_calling(df: pd.DataFrame, config: dict) -> pd.DataFr
     Returns:
         DataFrame with all multi-stage hit calling columns added
     """
-    from ..analytics import (
+    from analytics import (
         MultiStageHitCaller, 
         MultiStageConfig, 
         VitalityConfig
