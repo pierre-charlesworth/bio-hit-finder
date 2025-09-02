@@ -28,7 +28,7 @@ const Analysis = () => {
         onFileNameChange={setFileName}
         onProcessCallbackChange={setProcessCallback}
       />
-      <main>
+      <main className="pt-32">
         <div className="container-fluid max-w-7xl mx-auto py-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-light tracking-tight mb-4">

@@ -138,17 +138,6 @@ const ScreeningWorkflow = () => {
                           </ul>
                         </div>
 
-                        <div className="flex items-center justify-between pt-3 border-t">
-                          <div>
-                            <div className="text-lg font-light text-primary">{stage.hitRate}</div>
-                            <div className="text-xs text-muted-foreground">Hit Rate</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-sm font-medium text-foreground">{stage.hitCount}</div>
-                            <div className="text-xs text-muted-foreground">Extracts</div>
-                          </div>
-                        </div>
-
                         <div className="bg-muted/30 p-3 rounded text-xs">
                           <div className="font-medium mb-1">Biology:</div>
                           <div className="text-muted-foreground">{stage.biology}</div>
@@ -181,7 +170,7 @@ const ScreeningWorkflow = () => {
                           <IconComponent className="h-5 w-5" />
                         </div>
                         <Badge variant="secondary" className="text-xs">
-                          Stage {stage.id} • {stage.hitRate}
+                          Stage {stage.id}
                         </Badge>
                       </div>
                       <CardTitle className="text-lg">{stage.title}</CardTitle>

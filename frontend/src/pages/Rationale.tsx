@@ -16,7 +16,7 @@ const Rationale = () => {
         canProcess={false}
         isProcessing={false}
       />
-      <main>
+      <main className="pt-24">
         <div className="container-fluid max-w-7xl mx-auto py-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-light tracking-tight mb-4">
