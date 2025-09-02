@@ -33,7 +33,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Complex glycolipids forming the outer leaflet of the outer membrane',
       function: 'Primary antibiotic permeability barrier, endotoxin activity',
       reporterConnection: '<em>lptA</em> reporter detects disruption of LPS transport and assembly',
-      coordinates: { top: '5%', left: '15%', width: '70%', height: '25%' },
+      coordinates: { top: '0%', left: '8%', width: '84%', height: '15%' },
       color: 'bg-green-500/30 border-green-500'
     },
     {
@@ -42,7 +42,7 @@ const CellEnvelopeDiagram = () => {
       description: 'β-barrel proteins allowing selective permeability',
       function: 'Controlled passage of small molecules across outer membrane',
       reporterConnection: 'Porin function affects compound penetration and <em>lptA</em> stress response',
-      coordinates: { top: '20%', left: '45%', width: '10%', height: '20%' },
+      coordinates: { top: '15%', left: '42%', width: '16%', height: '30%' },
       color: 'bg-pink-500/30 border-pink-500'
     },
     {
@@ -51,7 +51,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Asymmetric lipid bilayer with unique LPS outer leaflet',
       function: 'Selective permeability barrier, first line of defense',
       reporterConnection: 'Primary target for outer membrane permeabilizers detected by <em>lptA</em>',
-      coordinates: { top: '28%', left: '10%', width: '80%', height: '8%' },
+      coordinates: { top: '30%', left: '0%', width: '100%', height: '10%' },
       color: 'bg-blue-500/30 border-blue-500'
     },
     {
@@ -60,7 +60,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Anchored proteins connecting outer membrane to peptidoglycan',
       function: 'Structural support and envelope integrity maintenance',
       reporterConnection: 'Bridge between OM and PG layers, affects both <em>lptA</em> and <em>ldtD</em> responses',
-      coordinates: { top: '32%', left: '20%', width: '15%', height: '8%' },
+      coordinates: { top: '38%', left: '12%', width: '76%', height: '8%' },
       color: 'bg-yellow-500/30 border-yellow-500'
     },
     {
@@ -69,7 +69,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Compartment between outer and inner membranes',
       function: 'Houses folding machinery, binding proteins, and stress sensors',
       reporterConnection: '<em>lptA</em> protein bridges LPS transport across this space',
-      coordinates: { top: '42%', left: '15%', width: '70%', height: '20%' },
+      coordinates: { top: '40%', left: '5%', width: '90%', height: '25%' },
       color: 'bg-cyan-500/20 border-cyan-500'
     },
     {
@@ -78,7 +78,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Cross-linked polymer mesh providing structural integrity',
       function: 'Maintains cell shape, prevents osmotic lysis',
       reporterConnection: '<em>ldtD</em> reporter activates when this layer requires reinforcement',
-      coordinates: { top: '50%', left: '20%', width: '60%', height: '6%' },
+      coordinates: { top: '55%', left: '8%', width: '84%', height: '10%' },
       color: 'bg-red-500/30 border-red-500'
     },
     {
@@ -87,7 +87,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Symmetric phospholipid bilayer with embedded proteins',
       function: 'Energy production, active transport, protein secretion',
       reporterConnection: 'Houses stress response machinery that regulates <em>lptA</em> and <em>ldtD</em>',
-      coordinates: { top: '65%', left: '10%', width: '80%', height: '8%' },
+      coordinates: { top: '75%', left: '0%', width: '100%', height: '10%' },
       color: 'bg-purple-500/30 border-purple-500'
     },
     {
@@ -96,7 +96,7 @@ const CellEnvelopeDiagram = () => {
       description: 'Internal cellular space containing genetic material and ribosomes',
       function: 'Metabolic processes, transcription, translation',
       reporterConnection: 'Site of <em>lptA</em> and <em>ldtD</em> transcription and reporter protein synthesis',
-      coordinates: { top: '75%', left: '15%', width: '70%', height: '20%' },
+      coordinates: { top: '85%', left: '5%', width: '90%', height: '15%' },
       color: 'bg-orange-500/20 border-orange-500'
     }
   ];
