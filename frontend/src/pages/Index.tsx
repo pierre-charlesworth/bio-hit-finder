@@ -1,50 +1,21 @@
-import { useState } from 'react';
 import Header from '@/components/Header';
-import DataUploadBar from '@/components/DataUploadBar';
 import Hero from '@/components/Hero';
-import WhyItMatters from '@/components/WhyItMatters';
-import ScreeningWorkflow from '@/components/ScreeningWorkflow';
-import AnalysisDashboard from '@/components/AnalysisDashboard';
-import WorkGrid from '@/components/WorkGrid';
-import QCLearningModule from '@/components/QCLearningModule';
-import PlatformValidation from '@/components/PlatformValidation';
-import ExpertCommentary from '@/components/ExpertCommentary';
 import About from '@/components/About';
 import Contact from '@/components/Contact';
 import Footer from '@/components/Footer';
 
 const Index = () => {
-  const [dataStatus, setDataStatus] = useState<'none' | 'uploaded' | 'sample' | 'processing' | 'error'>('none');
-  const [fileName, setFileName] = useState<string>('');
-  const [processCallback, setProcessCallback] = useState<(() => void) | null>(null);
-
-  const canProcess = dataStatus === 'uploaded' || dataStatus === 'sample';
-  const isProcessing = dataStatus === 'processing';
-
   return (
     <div className="min-h-screen">
       <Header 
-        dataStatus={dataStatus} 
-        fileName={fileName}
+        dataStatus="none" 
+        fileName=""
         backendStatus="connected"
-        onProcessData={processCallback || undefined}
-        canProcess={canProcess}
-        isProcessing={isProcessing}
-      />
-      <DataUploadBar 
-        onStatusChange={setDataStatus}
-        onFileNameChange={setFileName}
-        onProcessCallbackChange={setProcessCallback}
+        canProcess={false}
+        isProcessing={false}
       />
       <main>
         <Hero />
-        <WhyItMatters />
-        <ScreeningWorkflow />
-        <AnalysisDashboard />
-        <WorkGrid />
-        <QCLearningModule />
-        <PlatformValidation />
-        <ExpertCommentary />
         <About />
         <Contact />
       </main>

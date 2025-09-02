@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Menu, X, Upload, CheckCircle, AlertCircle, Database, Circle, Play } from 'lucide-react';
@@ -23,9 +24,9 @@ const Header = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navItems = [
-    { label: 'Work', href: '#work' },
-    { label: 'About', href: '#about' },
-    { label: 'Contact', href: '#contact' },
+    { label: 'Home', href: '/' },
+    { label: 'Analysis', href: '/analysis' },
+    { label: 'Rationale', href: '/rationale' },
   ];
 
   const getDataStatusBadge = () => {
@@ -90,13 +91,13 @@ const Header = ({
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center space-x-8">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.label}
-                  href={item.href}
+                  to={item.href}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {item.label}
-                </a>
+                </Link>
               ))}
             </nav>
 
@@ -117,14 +118,14 @@ const Header = ({
           <nav className="md:hidden py-4 border-t border-border">
             <div className="flex flex-col space-y-4">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.label}
-                  href={item.href}
+                  to={item.href}
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   {item.label}
-                </a>
+                </Link>
               ))}
             </div>
           </nav>
