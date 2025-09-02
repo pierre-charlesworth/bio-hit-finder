@@ -33,18 +33,19 @@ const AnalysisDashboard = () => {
   return (
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-light tracking-tight mb-4">Analysis Dashboard</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            {results ? `Results from ${results.fileName}` : 'Run demo or upload data to see analysis results'}
-          </p>
-          {isAnalyzing && (
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm text-muted-foreground">Analyzing...</span>
-            </div>
-          )}
-        </div>
+        {(results || isAnalyzing) && (
+          <div className="text-center mb-16">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              {results ? `Results from ${results.fileName}` : 'Run demo or upload data to see analysis results'}
+            </p>
+            {isAnalyzing && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm text-muted-foreground">Analyzing...</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-12">
