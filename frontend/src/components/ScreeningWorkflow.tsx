@@ -13,8 +13,8 @@ const ScreeningWorkflow = () => {
       icon: FlaskConical,
       description: "Dual-reporter system detects outer membrane disruption through stress response activation",
       criteria: [
-        "lptA Z-score ≥ 2.0 (LPS transport stress)",
-        "ldtD Z-score ≥ 2.0 (peptidoglycan stress)",
+        "<em>lptA</em> Z-score ≥ 2.0 (LPS transport stress)",
+        "<em>ldtD</em> Z-score ≥ 2.0 (peptidoglycan stress)",
         "ATP-based viability gating (BT > 0.3 × median)"
       ],
       hitRate: "~8%",
@@ -47,7 +47,7 @@ const ScreeningWorkflow = () => {
       icon: Target,
       description: "Compounds satisfying both reporter activation and vitality criteria",
       criteria: [
-        "Pass Stage 1: Reporter activation (lptA OR ldtD)",
+        "Pass Stage 1: Reporter activation (<em>lptA</em> OR <em>ldtD</em>)",
         "Pass Stage 2: Selective growth inhibition pattern", 
         "Cross-validated: Independent evidence of OM activity"
       ],
@@ -61,10 +61,10 @@ const ScreeningWorkflow = () => {
 
   const qualityMetrics = [
     {
-      metric: "Z'-Factor",
-      value: "≥0.5",
-      description: "Excellent assay performance",
-      tooltip: "Z'-factor"
+      metric: "Z-score Thresholds",
+      value: "≥2.0",
+      description: "Hit identification cutoffs",
+      tooltip: "MAD"
     },
     {
       metric: "Edge Effects",
@@ -132,7 +132,7 @@ const ScreeningWorkflow = () => {
                             {stage.criteria.map((criterion, idx) => (
                               <li key={idx} className="flex items-start gap-2">
                                 <div className="w-1 h-1 rounded-full bg-primary mt-2 flex-shrink-0"></div>
-                                {criterion}
+                                <span dangerouslySetInnerHTML={{ __html: criterion }} />
                               </li>
                             ))}
                           </ul>

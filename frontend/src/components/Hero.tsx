@@ -1,8 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowRight, ChevronDown, Microscope } from 'lucide-react';
-import { useState } from 'react';
-import CellEnvelopeDiagram from './CellEnvelopeDiagram';
+import { ArrowRight } from 'lucide-react';
 import { useApiTest, useDemoAnalysis } from '@/hooks/useApi';
 import { useToast } from '@/hooks/use-toast';
 import { useAnalysis } from '@/contexts/AnalysisContext';
@@ -12,7 +9,6 @@ const Hero = () => {
   const { toast } = useToast();
   const demoMutation = useDemoAnalysis();
   const { setCurrentAnalysis, setIsAnalyzing, setAnalysisError } = useAnalysis();
-  const [isCellDiagramOpen, setIsCellDiagramOpen] = useState(false);
 
   const handleDemoClick = () => {
     // Start analysis state
@@ -86,31 +82,7 @@ const Hero = () => {
             </div>
           </div>
 
-          {/* Cell Envelope Diagram */}
-          <div className="mt-12 max-w-4xl mx-auto text-reveal" style={{animationDelay: '0.4s'}}>
-            <Collapsible open={isCellDiagramOpen} onOpenChange={setIsCellDiagramOpen}>
-              <CollapsibleTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="w-full group hover:bg-muted/50 p-4 h-auto justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <Microscope className="h-5 w-5 text-primary" />
-                    <span className="font-medium">Interactive Cell Envelope Diagram</span>
-                  </div>
-                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isCellDiagramOpen ? 'rotate-180' : ''}`} />
-                </Button>
-              </CollapsibleTrigger>
-              
-              <CollapsibleContent>
-                <div className="mt-6">
-                  <CellEnvelopeDiagram />
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12 text-reveal" style={{animationDelay: '0.5s'}}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12 text-reveal" style={{animationDelay: '0.4s'}}>
             <Button 
               size="lg" 
               className="group"

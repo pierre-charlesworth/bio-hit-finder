@@ -40,7 +40,7 @@ const PlatformValidation = () => {
       icon: Microscope,
       value: "3",
       label: "Reporter Systems",
-      detail: "lptA, ldtD, and ATP viability",
+      detail: "<em>lptA</em>, <em>ldtD</em>, and ATP viability",
       color: "text-orange-500"
     },
     {
@@ -86,7 +86,7 @@ const PlatformValidation = () => {
   const keyFindings = [
     {
       finding: "Reporter Specificity",
-      description: "lptA and ldtD reporters show distinct activation patterns corresponding to different envelope stress mechanisms",
+      description: "<em>lptA</em> and <em>ldtD</em> reporters show distinct activation patterns corresponding to different envelope stress mechanisms",
       significance: "Enables mechanistic classification of hits",
       icon: Target
     },
@@ -138,7 +138,7 @@ const PlatformValidation = () => {
                     {metric.label}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {metric.detail}
+                    <span dangerouslySetInnerHTML={{ __html: metric.detail }} />
                   </div>
                 </CardContent>
               </Card>
@@ -164,7 +164,7 @@ const PlatformValidation = () => {
                           {finding.finding}
                         </h4>
                         <p className="text-sm text-muted-foreground mb-3">
-                          {finding.description}
+                          <span dangerouslySetInnerHTML={{ __html: finding.description }} />
                         </p>
                         <Badge variant="secondary" className="text-xs">
                           {finding.significance}

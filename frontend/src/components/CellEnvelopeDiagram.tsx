@@ -14,7 +14,7 @@ const CellEnvelopeDiagram = () => {
       name: 'Outer Membrane (OM)',
       description: 'Asymmetric lipid bilayer containing lipopolysaccharide (LPS) in the outer leaflet',
       function: 'Primary antibiotic barrier, contains porins for selective permeability',
-      targets: 'lptA reporter detects disruption of LPS transport to this layer',
+      targets: '<em>lptA</em> reporter detects disruption of LPS transport to this layer',
       position: { x: '10%', y: '20%', width: '80%', height: '8%' },
       color: 'bg-red-500'
     },
@@ -23,7 +23,7 @@ const CellEnvelopeDiagram = () => {
       name: 'Periplasmic Space',
       description: 'Compartment between inner and outer membranes containing periplasmic proteins',
       function: 'Houses protein folding machinery, nutrient binding proteins, and stress sensors',
-      targets: 'lptA protein bridges LPS transport complexes across this space',
+      targets: '<em>lptA</em> protein bridges LPS transport complexes across this space',
       position: { x: '15%', y: '32%', width: '70%', height: '20%' },
       color: 'bg-blue-300'
     },
@@ -32,7 +32,7 @@ const CellEnvelopeDiagram = () => {
       name: 'Peptidoglycan Layer',
       description: 'Cross-linked polymer providing structural integrity to the cell',
       function: 'Maintains cell shape, prevents osmotic lysis, contains 4-3 and 3-3 crosslinks',
-      targets: 'ldtD reporter activates when this layer requires structural reinforcement',
+      targets: '<em>ldtD</em> reporter activates when this layer requires structural reinforcement',
       position: { x: '20%', y: '38%', width: '60%', height: '6%' },
       color: 'bg-green-500'
     },
@@ -58,14 +58,14 @@ const CellEnvelopeDiagram = () => {
 
   const reporterSystems = [
     {
-      name: 'lptA Reporter',
+      name: '<em>lptA</em> Reporter',
       pathway: 'σE Stress Response',
       trigger: 'LPS transport disruption',
       location: 'Periplasm → OM transport',
       color: 'text-red-600'
     },
     {
-      name: 'ldtD Reporter', 
+      name: '<em>ldtD</em> Reporter', 
       pathway: 'Cpx Stress Response',
       trigger: 'Peptidoglycan damage',
       location: 'Peptidoglycan crosslinking',
@@ -158,7 +158,9 @@ const CellEnvelopeDiagram = () => {
                       
                       <div>
                         <div className="text-sm font-medium text-foreground mb-1">Reporter Targeting:</div>
-                        <p className="text-sm text-muted-foreground">{selectedInfo.targets}</p>
+                        <p className="text-sm text-muted-foreground">
+                          <span dangerouslySetInnerHTML={{ __html: selectedInfo.targets }} />
+                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -186,8 +188,8 @@ const CellEnvelopeDiagram = () => {
                     <div key={index} className="border rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className={`font-medium ${reporter.color}`}>
-                          <ScientificTooltip term={reporter.name.split(' ')[0]}>
-                            {reporter.name}
+                          <ScientificTooltip term={reporter.name.includes('lptA') ? 'lptA' : 'ldtD'}>
+                            <span dangerouslySetInnerHTML={{ __html: reporter.name }} />
                           </ScientificTooltip>
                         </div>
                         <Badge variant="outline" className="text-xs">

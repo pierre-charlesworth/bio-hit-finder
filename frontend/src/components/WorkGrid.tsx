@@ -6,10 +6,10 @@ const WorkGrid = () => {
       id: 1,
       title: 'Biological Rationale',
       category: '🔬 Reporter Systems',
-      description: 'Dual-reporter system using lptA (LPS transport) and ldtD (peptidoglycan) for envelope stress detection. Three-strain vitality screening with E. coli WT, ΔtolC, and S. aureus controls provides OM-selective compound identification.',
+      description: 'Dual-reporter system using <em>lptA</em> (LPS transport) and <em>ldtD</em> (peptidoglycan) for envelope stress detection. Three-strain vitality screening with E. coli WT, ΔtolC, and S. aureus controls provides OM-selective compound identification.',
       details: [
-        'σE-regulated lptA reporter for LPS transport disruption',
-        'Cpx-regulated ldtD reporter for peptidoglycan stress',
+        'σE-regulated <em>lptA</em> reporter for LPS transport disruption',
+        'Cpx-regulated <em>ldtD</em> reporter for peptidoglycan stress',
         'Three-strain selectivity profiling for therapeutic windows'
       ]
     },
@@ -83,7 +83,7 @@ const WorkGrid = () => {
                 </h3>
                 
                 <p className="text-muted-foreground text-sm leading-relaxed mb-4">
-                  {area.description}
+                  <span dangerouslySetInnerHTML={{ __html: area.description }} />
                 </p>
                 
                 <div className="space-y-2">
@@ -91,7 +91,7 @@ const WorkGrid = () => {
                     <div key={detailIndex} className="flex items-start gap-2">
                       <div className="w-1 h-1 rounded-full bg-primary mt-2 flex-shrink-0"></div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        {detail}
+                        <span dangerouslySetInnerHTML={{ __html: detail }} />
                       </p>
                     </div>
                   ))}

@@ -239,7 +239,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                         <Badge variant="outline" className="text-xs font-mono">BT_lptA</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        <strong>lptA reporter:</strong> BetaGlo signal (BG) measures β-galactosidase activity from the lptA promoter. BacTiter signal (BT) normalizes for cell density. The BG/BT ratio indicates lptA expression levels.
+                        <strong><em>lptA</em> reporter:</strong> BetaGlo signal (BG) measures β-galactosidase activity from the <em>lptA</em> promoter. BacTiter signal (BT) normalizes for cell density. The BG/BT ratio indicates <em>lptA</em> expression levels.
                       </p>
                     </div>
                     
@@ -249,7 +249,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                         <Badge variant="outline" className="text-xs font-mono">BT_ldtD</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        <strong>ldtD reporter:</strong> Similar dual-reporter system for ldtD promoter activity. Both reporters help identify compounds affecting envelope stress response pathways.
+                        <strong><em>ldtD</em> reporter:</strong> Similar dual-reporter system for <em>ldtD</em> promoter activity. Both reporters help identify compounds affecting envelope stress response pathways.
                       </p>
                     </div>
 
