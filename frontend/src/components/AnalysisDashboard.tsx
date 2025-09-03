@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2 } from 'lucide-react';
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import { useAnalysisDefaults } from '@/hooks/useApi';
-import FunnelDiagram from '@/components/FunnelDiagram';
+import SankeyDiagram from '@/components/SankeyDiagram';
 
 const AnalysisDashboard = () => {
   const { currentAnalysis, isAnalyzing } = useAnalysis();
@@ -82,10 +82,10 @@ const AnalysisDashboard = () => {
           </Card>
         </div>
 
-        {/* Pipeline Funnel */}
+        {/* Pipeline Sankey Diagram */}
         {results && (
           <div className="mb-12">
-            <FunnelDiagram analysisData={currentAnalysis!} />
+            <SankeyDiagram analysisData={currentAnalysis!} />
           </div>
         )}
 
