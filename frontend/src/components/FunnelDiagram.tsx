@@ -41,12 +41,6 @@ const FunnelDiagram = ({ analysisData }: FunnelDiagramProps) => {
     }
   ];
 
-  const getStageWidth = (percentage: number) => {
-    const minWidth = 20; // Minimum width percentage
-    const maxWidth = 100; // Maximum width percentage
-    return Math.max(minWidth, (percentage / 100) * maxWidth);
-  };
-
   const getRetentionRate = (currentStage: number, previousStage: number) => {
     if (previousStage === 0) return 0;
     return (currentStage / previousStage * 100);
@@ -59,73 +53,77 @@ const FunnelDiagram = ({ analysisData }: FunnelDiagramProps) => {
           <span className="text-lg font-semibold">OM Permeabilizer Discovery Pipeline</span>
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Flow shows compound filtering through biological evidence requirements
+          Funnel shows compound filtering through biological evidence requirements
         </p>
       </CardHeader>
       <CardContent className="p-6">
-        <div className="relative">
+        <div className="relative flex flex-col items-center">
           {/* Funnel stages */}
-          <div className="space-y-4">
+          <div className="space-y-1 w-full max-w-md">
             {stages.map((stage, index) => {
-              const width = getStageWidth(stage.percentage);
+              // Calculate funnel width based on percentage (narrowing down)
+              const funnelWidth = Math.max(30, stage.percentage); // Minimum 30% for visibility
               const previousStage = index > 0 ? stages[index - 1] : null;
               const retentionRate = previousStage ? getRetentionRate(stage.count, previousStage.count) : 100;
               
               return (
-                <div key={stage.name} className="relative">
-                  {/* Stage bar */}
-                  <div className="flex items-center gap-4 mb-2">
+                <div key={stage.name} className="relative flex flex-col items-center">
+                  {/* Funnel segment */}
+                  <div className="relative group">
                     <div 
-                      className="relative h-16 rounded-lg flex items-center justify-center transition-all duration-300 hover:shadow-lg"
+                      className="h-16 flex items-center justify-center transition-all duration-300 hover:brightness-110 relative"
                       style={{ 
                         backgroundColor: stage.color,
-                        width: `${width}%`,
-                        minWidth: '200px'
+                        width: `${funnelWidth}%`,
+                        clipPath: index === 0 
+                          ? 'polygon(0% 0%, 100% 0%, 85% 100%, 15% 100%)'  // Top trapezoid
+                          : index === stages.length - 1 
+                          ? 'polygon(15% 0%, 85% 0%, 50% 100%, 50% 100%)'   // Bottom triangle
+                          : 'polygon(15% 0%, 85% 0%, 70% 100%, 30% 100%)'   // Middle trapezoids
                       }}
                     >
-                      <div className="text-white font-semibold text-center">
-                        <div className="text-xl">{stage.count}</div>
-                        <div className="text-xs opacity-90">{stage.name}</div>
+                      <div className="text-white font-semibold text-center relative z-10">
+                        <div className="text-lg font-bold">{stage.count}</div>
+                        <div className="text-xs opacity-90 font-medium">{stage.name}</div>
                       </div>
                     </div>
                     
-                    {/* Stage info */}
-                    <div className="flex-1 flex items-center gap-2">
-                      <Badge variant="secondary">
-                        {stage.percentage.toFixed(1)}%
-                      </Badge>
-                      {index > 0 && (
-                        <Badge variant="outline">
-                          {retentionRate.toFixed(1)}% retention
-                        </Badge>
-                      )}
+                    {/* Hover tooltip */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                      {stage.percentage.toFixed(1)}% of total
+                      {index > 0 && ` (${retentionRate.toFixed(1)}% retention)`}
                     </div>
                   </div>
                   
-                  {/* Connection arrow */}
-                  {index < stages.length - 1 && (
-                    <div className="flex items-center justify-center py-2">
-                      <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-muted-foreground/30"></div>
-                    </div>
-                  )}
+                  {/* Stats beside funnel */}
+                  <div className="flex items-center gap-2 mt-1 mb-2">
+                    <Badge variant="secondary" className="text-xs">
+                      {stage.percentage.toFixed(1)}%
+                    </Badge>
+                    {index > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {retentionRate.toFixed(1)}% kept
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
           
           {/* Summary stats */}
-          <div className="mt-6 pt-4 border-t border-border">
+          <div className="mt-8 pt-4 border-t border-border w-full">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
               <div>
                 <div className="text-lg font-semibold text-blue-600">{stages[1].count}</div>
                 <div className="text-xs text-muted-foreground">Reporter Hits</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-green-600">{stages[2].count}</div>
+                <div className="text-lg font-semibold text-orange-600">{stages[2].count}</div>
                 <div className="text-xs text-muted-foreground">Vitality Hits</div>
               </div>
               <div>
-                <div className="text-lg font-semibold text-red-600">{stages[3].count}</div>
+                <div className="text-lg font-semibold text-green-600">{stages[3].count}</div>
                 <div className="text-xs text-muted-foreground">Platform Hits</div>
               </div>
               <div>
