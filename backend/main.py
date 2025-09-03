@@ -215,8 +215,24 @@ async def analyze_demo_data(config: Optional[Dict[str, Any]] = None):
         if config is None:
             config = {}
         
+        # Convert dict config to MultiStageConfig object
+        multi_config = MultiStageConfig()
+        if config:
+            multi_config.z_threshold = config.get('z_threshold', 2.0)
+            multi_config.viability_column = config.get('viability_column', 'PassViab')
+            multi_config.require_both_stages = config.get('require_both_stages', True)
+            
+            # Handle vitality config
+            if 'vitality_config' in config:
+                vitality_data = config['vitality_config']
+                multi_config.vitality_config = VitalityConfig(
+                    tolc_threshold=vitality_data.get('tolc_threshold', 0.8),
+                    wt_threshold=vitality_data.get('wt_threshold', 0.8),
+                    sa_threshold=vitality_data.get('sa_threshold', 0.8)
+                )
+        
         # Run multi-stage analysis
-        results_df, summary = run_multi_stage_analysis(demo_data, config)
+        results_df, summary = run_multi_stage_analysis(demo_data, multi_config)
         
         # Convert to JSON-serializable format
         results = results_df.to_dict(orient='records')
