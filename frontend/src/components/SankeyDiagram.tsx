@@ -6,6 +6,7 @@ import { Sankey, ResponsiveContainer, Tooltip } from 'recharts';
 interface SankeyNode {
   name: string;
   id: number;
+  color?: string;
 }
 
 interface SankeyLink {
@@ -31,38 +32,54 @@ const SankeyDiagram = ({ analysisData }: SankeyDiagramProps) => {
   const vitalityHits = analysisData.summary?.stage2_vitality_hits || 0;
   const platformHits = analysisData.summary?.stage3_platform_hits || 0;
 
-  // Create Sankey data structure
+  // Create Sankey data structure with color coding matching the overview metrics
   const sankeyData: SankeyData = {
     nodes: [
-      { name: `Total Wells (${totalWells})`, id: 0 },
-      { name: `Reporter Hits (${reporterHits})`, id: 1 },
-      { name: `Vitality Hits (${vitalityHits})`, id: 2 },
-      { name: `Platform Hits (${platformHits})`, id: 3 }
+      { 
+        name: `Total Wells\n${totalWells}`, 
+        id: 0,
+        color: '#64748B' // gray for total wells
+      },
+      { 
+        name: `Reporter Hits\n${reporterHits}`, 
+        id: 1,
+        color: '#3B82F6' // blue to match overview
+      },
+      { 
+        name: `Vitality Hits\n${vitalityHits}`, 
+        id: 2,
+        color: '#8B5CF6' // purple to match overview  
+      },
+      { 
+        name: `Platform Hits\n${platformHits}`, 
+        id: 3,
+        color: '#10B981' // green to match overview
+      }
     ],
     links: [
       {
         source: 0,
         target: 1,
         value: reporterHits,
-        color: 'rgba(59, 130, 246, 0.6)' // blue
+        color: 'rgba(59, 130, 246, 0.6)' // blue flow
       },
       {
         source: 0,
         target: 2,
         value: vitalityHits,
-        color: 'rgba(16, 185, 129, 0.6)' // green
+        color: 'rgba(139, 92, 246, 0.6)' // purple flow
       },
       {
         source: 1,
         target: 3,
         value: platformHits,
-        color: 'rgba(239, 68, 68, 0.8)' // red - final hits
+        color: 'rgba(16, 185, 129, 0.8)' // green flow to final hits
       },
       {
         source: 2,
         target: 3,
         value: platformHits,
-        color: 'rgba(239, 68, 68, 0.8)' // red - final hits
+        color: 'rgba(16, 185, 129, 0.8)' // green flow to final hits
       }
     ]
   };
@@ -109,7 +126,7 @@ const SankeyDiagram = ({ analysisData }: SankeyDiagramProps) => {
           </ResponsiveContainer>
         </div>
         
-        {/* Summary statistics */}
+        {/* Summary statistics matching overview colors */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-border">
           <div className="text-center">
             <div className="text-lg font-semibold text-blue-600">{reporterHits}</div>
@@ -119,21 +136,21 @@ const SankeyDiagram = ({ analysisData }: SankeyDiagramProps) => {
             </Badge>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-green-600">{vitalityHits}</div>
+            <div className="text-lg font-semibold text-purple-600">{vitalityHits}</div>
             <div className="text-xs text-muted-foreground">Vitality Hits</div>
             <Badge variant="secondary" className="text-xs mt-1">
               {((vitalityHits / totalWells) * 100).toFixed(1)}%
             </Badge>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-red-600">{platformHits}</div>
+            <div className="text-lg font-semibold text-green-600">{platformHits}</div>
             <div className="text-xs text-muted-foreground">Platform Hits</div>
             <Badge variant="secondary" className="text-xs mt-1">
               {((platformHits / totalWells) * 100).toFixed(1)}%
             </Badge>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-purple-600">
+            <div className="text-lg font-semibold text-slate-600">
               {platformHits > 0 ? `${((platformHits / totalWells) * 100).toFixed(2)}%` : '0%'}
             </div>
             <div className="text-xs text-muted-foreground">Success Rate</div>
