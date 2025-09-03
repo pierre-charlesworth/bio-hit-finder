@@ -2,24 +2,18 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Menu, X, Upload, CheckCircle, AlertCircle, Database, Circle, Play } from 'lucide-react';
+import { Menu, X, Upload, CheckCircle, AlertCircle, Database, Circle } from 'lucide-react';
 
 interface HeaderProps {
   dataStatus?: 'none' | 'uploaded' | 'sample' | 'processing' | 'error';
   fileName?: string;
   backendStatus?: 'connected' | 'connecting' | 'error';
-  onProcessData?: () => void;
-  canProcess?: boolean;
-  isProcessing?: boolean;
 }
 
 const Header = ({ 
   dataStatus = 'none', 
   fileName, 
-  backendStatus = 'connected',
-  onProcessData,
-  canProcess = false,
-  isProcessing = false
+  backendStatus = 'connected'
 }: HeaderProps) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -63,27 +57,6 @@ const Header = ({
           <div className="flex items-center gap-3">
             {getDataStatusBadge()}
             {getBackendStatusBadge()}
-          </div>
-
-          {/* Center - Process Button */}
-          <div className="flex items-center">
-            <div 
-              className={`transition-all duration-300 ease-in-out ${
-                canProcess 
-                  ? 'opacity-100 scale-100 translate-y-0' 
-                  : 'opacity-0 scale-95 translate-y-1 pointer-events-none'
-              }`}
-            >
-              <Button 
-                size="sm" 
-                className="gap-1"
-                onClick={onProcessData}
-                disabled={isProcessing}
-              >
-                <Play className="h-3 w-3" />
-                {isProcessing ? 'Processing...' : 'Process'}
-              </Button>
-            </div>
           </div>
 
           {/* Right Side - Navigation */}

@@ -56,6 +56,23 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     },
   });
 
+  const demoMutation = useMutation({
+    mutationFn: () => api.getDemoAnalysis({
+      viability_gate: viabilityThreshold,
+      z_score_threshold: zScoreCutoff,
+      use_b_scoring: useBScoring,
+      edge_effect_threshold: edgeEffectThreshold
+    }),
+    onSuccess: (data) => {
+      console.log('Demo analysis successful:', data);
+      onStatusChange?.('uploaded');
+    },
+    onError: (error) => {
+      console.error('Demo analysis failed:', error);
+      onStatusChange?.('error');
+    },
+  });
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -93,9 +110,9 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     if (uploadedFile) {
       uploadMutation.mutate(uploadedFile);
     } else if (useSampleData) {
-      // Process sample data
+      // Process sample data using demo endpoint
       console.log('Processing sample data...');
-      uploadMutation.mutate(new File(['sample,data'], 'sample-data.csv', { type: 'text/csv' }));
+      demoMutation.mutate();
     }
   };
 
@@ -152,11 +169,11 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                   htmlFor="file-upload-square" 
                   className={`absolute inset-0 flex items-center justify-center ${useSampleData ? 'cursor-not-allowed' : 'cursor-pointer'}`}
                 >
-                  {uploadMutation.isPending ? (
+                  {(uploadMutation.isPending || demoMutation.isPending) ? (
                     <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
                   ) : uploadedFile ? (
                     <CheckCircle className="h-5 w-5 text-green-600" />
-                  ) : uploadMutation.isError ? (
+                  ) : (uploadMutation.isError || demoMutation.isError) ? (
                     <AlertCircle className="h-5 w-5 text-red-500" />
                   ) : (
                     <Upload className={`h-5 w-5 ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} />
@@ -177,10 +194,10 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                 size="sm" 
                 className="gap-1"
                 onClick={handleProcessData}
-                disabled={uploadMutation.isPending || (!uploadedFile && !useSampleData)}
+                disabled={(uploadMutation.isPending || demoMutation.isPending) || (!uploadedFile && !useSampleData)}
               >
                 <Play className="h-3 w-3" />
-                {uploadMutation.isPending ? 'Processing...' : 'Process'}
+                {(uploadMutation.isPending || demoMutation.isPending) ? 'Processing...' : 'Process'}
               </Button>
             </div>
           </div>

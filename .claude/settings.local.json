@@ -32,7 +32,8 @@
       "mcp__render__list_deploys",
       "mcp__render__get_deploy",
       "mcp__render__list_logs",
-      "Read(/Users/pierrecharlesworth/Downloads/**)"
+      "Read(/Users/pierrecharlesworth/Downloads/**)",
+      "mcp__render__list_workspaces"
     ],
     "deny": [],
     "ask": []
