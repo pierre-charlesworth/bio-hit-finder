@@ -5,6 +5,7 @@ import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2 } from 'lu
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import { useAnalysisDefaults } from '@/hooks/useApi';
 import SankeyDiagram from '@/components/SankeyDiagram';
+import ChartsGrid from '@/components/visualizations/charts/ChartsGrid';
 
 const AnalysisDashboard = () => {
   const { currentAnalysis, isAnalyzing } = useAnalysis();
@@ -165,6 +166,16 @@ const AnalysisDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Statistical Visualizations */}
+        {results && (
+          <div className="mb-12">
+            <ChartsGrid 
+              analysisData={currentAnalysis!}
+              zScoreThreshold={config.z_score_threshold}
+            />
+          </div>
+        )}
 
         {/* Visualizations Grid */}
         <Card>
