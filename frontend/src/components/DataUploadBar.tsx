@@ -58,10 +58,14 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
 
   const demoMutation = useMutation({
     mutationFn: () => api.getDemoAnalysis({
-      viability_gate: viabilityThreshold,
-      z_score_threshold: zScoreCutoff,
-      use_b_scoring: useBScoring,
-      edge_effect_threshold: edgeEffectThreshold
+      z_threshold: zScoreCutoff,
+      vitality_config: {
+        tolc_threshold: 0.8,
+        wt_threshold: 0.8,
+        sa_threshold: 0.8
+      },
+      viability_column: 'PassViab',
+      require_both_stages: true
     }),
     onSuccess: (data) => {
       console.log('Demo analysis successful:', data);
