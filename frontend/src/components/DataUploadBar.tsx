@@ -23,6 +23,7 @@ import {
   Target
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { useAnalysis } from '@/contexts/AnalysisContext';
 
 interface DataUploadBarProps {
   onStatusChange?: (status: 'none' | 'uploaded' | 'sample' | 'processing' | 'error') => void;
@@ -37,6 +38,8 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
   const [isDragOver, setIsDragOver] = useState(false);
   const [useSampleData, setUseSampleData] = useState(false);
   
+  const { setCurrentAnalysis } = useAnalysis();
+  
   // Configuration state
   const [viabilityThreshold, setViabilityThreshold] = useState(0.3);
   const [zScoreCutoff, setZScoreCutoff] = useState(2.0);
@@ -47,6 +50,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     mutationFn: api.uploadFile,
     onSuccess: (data) => {
       console.log('Upload successful:', data);
+      setCurrentAnalysis(data);
       onStatusChange?.('uploaded');
     },
     onError: (error) => {
@@ -69,6 +73,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     }),
     onSuccess: (data) => {
       console.log('Demo analysis successful:', data);
+      setCurrentAnalysis(data);
       onStatusChange?.('uploaded');
     },
     onError: (error) => {
