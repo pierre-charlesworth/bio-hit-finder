@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2 } from 'lucide-react';
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import { useAnalysisDefaults } from '@/hooks/useApi';
+import FunnelDiagram from '@/components/FunnelDiagram';
 
 const AnalysisDashboard = () => {
   const { currentAnalysis, isAnalyzing } = useAnalysis();
@@ -57,18 +58,6 @@ const AnalysisDashboard = () => {
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light text-green-600">{results?.platformHits || '—'}</div>
-              <div className="text-sm text-muted-foreground">Platform Hits</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-light">{results ? `${(results.platformHitRate * 100).toFixed(1)}%` : '—'}</div>
-              <div className="text-sm text-muted-foreground">Platform Hit Rate</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 text-center">
               <div className="text-2xl font-light text-blue-600">{results?.reporterHits || '—'}</div>
               <div className="text-sm text-muted-foreground">Reporter Hits</div>
             </CardContent>
@@ -79,7 +68,26 @@ const AnalysisDashboard = () => {
               <div className="text-sm text-muted-foreground">Vitality Hits</div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-light text-green-600">{results?.platformHits || '—'}</div>
+              <div className="text-sm text-muted-foreground">Platform Hits</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-light">{results ? `${(results.platformHitRate * 100).toFixed(1)}%` : '—'}</div>
+              <div className="text-sm text-muted-foreground">Hit Rate</div>
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Pipeline Funnel */}
+        {results && (
+          <div className="mb-12">
+            <FunnelDiagram analysisData={currentAnalysis!} />
+          </div>
+        )}
 
         {/* Analysis Results */}
         <div className="grid md:grid-cols-2 gap-8 mb-12">
