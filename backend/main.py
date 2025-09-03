@@ -264,6 +264,198 @@ async def analyze_demo_data(config: Optional[Dict[str, Any]] = None):
         logger.error(f"Demo analysis failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Demo analysis failed: {str(e)}")
 
+@app.get("/api/v1/analysis/funnel-data")
+async def get_funnel_data():
+    """Get funnel visualization data from demo multi-stage analysis.
+    
+    Returns:
+        Dict with funnel stages, counts, percentages, and connections
+    """
+    try:
+        # Generate demo data and run analysis for funnel visualization
+        demo_data = _generate_demo_dual_readout_data()
+        multi_config = MultiStageConfig()
+        results_df, summary = run_multi_stage_analysis(demo_data, multi_config)
+        
+        return _extract_funnel_data_from_analysis(results_df, summary)
+        
+    except Exception as e:
+        logger.error(f"Funnel data generation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Funnel data generation failed: {str(e)}")
+
+@app.post("/api/v1/analysis/funnel-data")
+async def get_funnel_data_from_results(file: UploadFile = File(...), config: Optional[str] = None):
+    """Get funnel visualization data from uploaded plate analysis results.
+    
+    Args:
+        file: Excel/CSV file with plate data
+        config: JSON string with analysis configuration (optional)
+    
+    Returns:
+        Dict with funnel stages, counts, percentages, and connections
+    """
+    try:
+        # Parse configuration
+        analysis_config = {}
+        if config:
+            try:
+                analysis_config = json.loads(config)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Invalid JSON in config parameter")
+        
+        # Load file data
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.StringIO((await file.read()).decode('utf-8')))
+        elif file.filename.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(io.BytesIO(await file.read()))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV or Excel files.")
+        
+        # Convert dict config to MultiStageConfig object
+        multi_config = MultiStageConfig()
+        if analysis_config:
+            multi_config.z_threshold = analysis_config.get('z_threshold', 2.0)
+            multi_config.viability_column = analysis_config.get('viability_column', 'PassViab')
+            multi_config.require_both_stages = analysis_config.get('require_both_stages', True)
+            
+            # Handle vitality config
+            if 'vitality_config' in analysis_config:
+                vitality_data = analysis_config['vitality_config']
+                multi_config.vitality_config = VitalityConfig(
+                    tolc_threshold=vitality_data.get('tolc_threshold', 0.8),
+                    wt_threshold=vitality_data.get('wt_threshold', 0.8),
+                    sa_threshold=vitality_data.get('sa_threshold', 0.8)
+                )
+        
+        # Run multi-stage analysis
+        results_df, summary = run_multi_stage_analysis(df, multi_config)
+        
+        return _extract_funnel_data_from_analysis(results_df, summary)
+        
+    except Exception as e:
+        logger.error(f"Funnel data extraction from file failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Funnel data extraction failed: {str(e)}")
+
+def _extract_funnel_data_from_analysis(results_df: pd.DataFrame, summary: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract funnel visualization data from multi-stage analysis results.
+    
+    Args:
+        results_df: DataFrame with multi-stage analysis results
+        summary: Summary statistics from analysis
+        
+    Returns:
+        Dict with funnel stages and connections for visualization
+    """
+    # Convert numpy types to native Python types for JSON serialization
+    total_wells = int(summary.get('total_wells', len(results_df)))
+    stage1_hits = int(summary.get('stage1_reporter_hits', 0))
+    stage2_hits = int(summary.get('stage2_vitality_hits', 0))
+    stage3_hits = int(summary.get('stage3_platform_hits', 0))
+    
+    # Define stages with counts, percentages, and colors
+    stages = [
+        {
+            "name": "Total Wells",
+            "count": total_wells,
+            "percentage": 100.0,
+            "color": "#3B82F6",
+            "description": f"All {total_wells} wells in the analysis"
+        },
+        {
+            "name": "Reporter Hits", 
+            "count": stage1_hits,
+            "percentage": round((stage1_hits / total_wells * 100), 1) if total_wells > 0 else 0,
+            "color": "#F59E0B",
+            "description": f"Wells with Z-score ≥ threshold and viable (Stage 1)"
+        },
+        {
+            "name": "Vitality Hits",
+            "count": stage2_hits,
+            "percentage": round((stage2_hits / total_wells * 100), 1) if total_wells > 0 else 0,
+            "color": "#10B981", 
+            "description": f"Wells with growth pattern hits (Stage 2)"
+        },
+        {
+            "name": "Platform Hits",
+            "count": stage3_hits,
+            "percentage": round((stage3_hits / total_wells * 100), 1) if total_wells > 0 else 0,
+            "color": "#EF4444",
+            "description": f"Final hits combining reporter and vitality signals (Stage 3)"
+        }
+    ]
+    
+    # Calculate retention rates between stages
+    connections = []
+    
+    # Total Wells → Reporter Hits
+    if total_wells > 0:
+        connections.append({
+            "from": 0,
+            "to": 1,
+            "retention_rate": round(stage1_hits / total_wells, 3),
+            "description": f"{stage1_hits} of {total_wells} wells became reporter hits"
+        })
+    
+    # Reporter Hits → Vitality Hits (this shows overlap, not sequential flow)
+    # For funnel visualization, we calculate how many vitality hits there are relative to reporter hits
+    if stage1_hits > 0:
+        connections.append({
+            "from": 1,
+            "to": 2, 
+            "retention_rate": round(stage2_hits / stage1_hits, 3),
+            "description": f"{stage2_hits} vitality hits among {stage1_hits} reporter hits"
+        })
+    else:
+        connections.append({
+            "from": 1,
+            "to": 2,
+            "retention_rate": 0.0,
+            "description": "No reporter hits to compare vitality hits against"
+        })
+    
+    # Vitality Hits → Platform Hits  
+    if stage2_hits > 0:
+        connections.append({
+            "from": 2,
+            "to": 3,
+            "retention_rate": round(stage3_hits / stage2_hits, 3),
+            "description": f"{stage3_hits} platform hits from {stage2_hits} vitality hits"
+        })
+    else:
+        connections.append({
+            "from": 2,
+            "to": 3,
+            "retention_rate": 0.0,
+            "description": "No vitality hits to generate platform hits"
+        })
+    
+    # Add metadata about the analysis with numpy type conversion
+    def convert_numpy_types(obj):
+        """Convert numpy types to Python native types for JSON serialization."""
+        if isinstance(obj, dict):
+            return {k: convert_numpy_types(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy_types(item) for item in obj]
+        elif hasattr(obj, 'item'):  # numpy scalar
+            return obj.item()
+        else:
+            return obj
+    
+    metadata = {
+        "analysis_config": convert_numpy_types(summary.get('config_used', {})),
+        "stage_overlap": convert_numpy_types(summary.get('stage_overlap', {})),
+        "hit_type_distribution": convert_numpy_types(summary.get('hit_type_distribution', {})),
+        "confidence_stats": convert_numpy_types(summary.get('confidence_stats', {})),
+        "total_wells": total_wells,
+        "analysis_timestamp": pd.Timestamp.now().isoformat()
+    }
+    
+    return {
+        "stages": stages,
+        "connections": connections,
+        "metadata": metadata
+    }
+
 def _generate_multi_stage_summary(df: pd.DataFrame) -> Dict[str, Any]:
     """Generate summary statistics from multi-stage analysis results."""
     total_wells = len(df)
