@@ -1,25 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AnalysisResult } from '@/types/analysis';
-import { Sankey, ResponsiveContainer, Tooltip } from 'recharts';
-
-interface SankeyNode {
-  name: string;
-  id: number;
-  color?: string;
-}
-
-interface SankeyLink {
-  source: number;
-  target: number;
-  value: number;
-  color?: string;
-}
-
-interface SankeyData {
-  nodes: SankeyNode[];
-  links: SankeyLink[];
-}
+import Plot from 'react-plotly.js';
 
 interface SankeyDiagramProps {
   analysisData: AnalysisResult;
@@ -32,77 +14,6 @@ const SankeyDiagram = ({ analysisData }: SankeyDiagramProps) => {
   const vitalityHits = analysisData.summary?.stage2_vitality_hits || 0;
   const platformHits = analysisData.summary?.stage3_platform_hits || 0;
 
-  // Create Sankey data structure with color coding matching the overview metrics
-  const sankeyData: SankeyData = {
-    nodes: [
-      { 
-        name: `Total Wells\n${totalWells}`, 
-        id: 0,
-        color: '#64748B' // gray for total wells
-      },
-      { 
-        name: `Reporter Hits\n${reporterHits}`, 
-        id: 1,
-        color: '#3B82F6' // blue to match overview
-      },
-      { 
-        name: `Vitality Hits\n${vitalityHits}`, 
-        id: 2,
-        color: '#8B5CF6' // purple to match overview  
-      },
-      { 
-        name: `Platform Hits\n${platformHits}`, 
-        id: 3,
-        color: '#10B981' // green to match overview
-      }
-    ],
-    links: [
-      {
-        source: 0,
-        target: 1,
-        value: reporterHits,
-        color: 'rgba(59, 130, 246, 0.6)' // blue flow
-      },
-      {
-        source: 0,
-        target: 2,
-        value: vitalityHits,
-        color: 'rgba(139, 92, 246, 0.6)' // purple flow
-      },
-      {
-        source: 1,
-        target: 3,
-        value: platformHits,
-        color: 'rgba(16, 185, 129, 0.8)' // green flow to final hits
-      },
-      {
-        source: 2,
-        target: 3,
-        value: platformHits,
-        color: 'rgba(16, 185, 129, 0.8)' // green flow to final hits
-      }
-    ]
-  };
-
-  // Custom tooltip component
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-    
-    const data = payload[0];
-    if (data.payload.source !== undefined) {
-      // This is a link
-      const sourceNode = sankeyData.nodes[data.payload.source];
-      const targetNode = sankeyData.nodes[data.payload.target];
-      return (
-        <div className="bg-white p-3 border border-border rounded shadow-lg">
-          <p className="font-medium">{`${sourceNode.name} → ${targetNode.name}`}</p>
-          <p className="text-sm text-muted-foreground">{`${data.payload.value} compounds`}</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <Card className="w-full">
       <CardHeader>
@@ -114,16 +25,48 @@ const SankeyDiagram = ({ analysisData }: SankeyDiagramProps) => {
         </p>
       </CardHeader>
       <CardContent className="p-6">
-        <div className="h-80 w-full mb-6">
-          <ResponsiveContainer width="100%" height="100%">
-            <Sankey
-              data={sankeyData}
-              nodePadding={10}
-              margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-            >
-              <Tooltip content={<CustomTooltip />} />
-            </Sankey>
-          </ResponsiveContainer>
+        <div className="h-96 w-full mb-6">
+          <Plot
+            data={[
+              {
+                type: 'sankey',
+                node: {
+                  pad: 15,
+                  thickness: 20,
+                  line: { color: 'black', width: 0.5 },
+                  label: [
+                    `Total Wells<br>(${totalWells})`,
+                    `Reporter Hits<br>(${reporterHits})`,
+                    `Vitality Hits<br>(${vitalityHits})`,
+                    `Platform Hits<br>(${platformHits})`
+                  ],
+                  color: ['#64748B', '#3B82F6', '#8B5CF6', '#10B981']
+                },
+                link: {
+                  source: [0, 0, 1, 2],
+                  target: [1, 2, 3, 3],
+                  value: [reporterHits, vitalityHits, platformHits, platformHits],
+                  color: [
+                    'rgba(59, 130, 246, 0.6)',   // blue flow to reporter
+                    'rgba(139, 92, 246, 0.6)',   // purple flow to vitality  
+                    'rgba(16, 185, 129, 0.8)',   // green flow to platform hits
+                    'rgba(16, 185, 129, 0.8)'    // green flow to platform hits
+                  ]
+                }
+              }
+            ]}
+            layout={{
+              title: '',
+              height: 400,
+              margin: { l: 50, r: 50, t: 20, b: 20 },
+              font: { size: 12 }
+            }}
+            config={{ 
+              displayModeBar: false,
+              responsive: true
+            }}
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
         
         {/* Summary statistics matching overview colors */}
