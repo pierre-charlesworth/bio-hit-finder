@@ -120,89 +120,108 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
   return (
     <div className="fixed top-[73px] left-0 right-0 z-40 border-b bg-background/80 backdrop-blur-sm border-border">
       <div className="container-fluid max-w-7xl mx-auto">
-        {/* Main Bar */}
-        <div className="flex items-center justify-between py-3">
-          {/* Left Side - Upload Area */}
-          <div className="flex items-center gap-4">
-            <div
-              className={`relative h-12 w-12 border-2 border-dashed rounded-lg transition-all duration-200 ${
-                useSampleData
-                  ? 'border-muted bg-muted/20 cursor-not-allowed opacity-50'
-                  : isDragOver 
-                  ? 'border-primary bg-primary/10 cursor-pointer' 
-                  : uploadedFile
-                  ? 'border-green-500 bg-green-50 dark:bg-green-950 cursor-pointer'
-                  : 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'
-              }`}
-              onDrop={useSampleData ? undefined : handleDrop}
-              onDragOver={useSampleData ? undefined : handleDragOver}
-              onDragLeave={useSampleData ? undefined : handleDragLeave}
-            >
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="file-upload-square"
-                disabled={useSampleData}
-              />
-              <label 
-                htmlFor="file-upload-square" 
-                className={`absolute inset-0 flex items-center justify-center ${useSampleData ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+        {/* Main Bar - Two Lines */}
+        <div className="py-3 space-y-3">
+          {/* First Line - Upload Area + Process Button */}
+          <div className="flex items-center justify-between">
+            {/* Left Side - Upload Area */}
+            <div className="flex items-center gap-4">
+              <div
+                className={`relative h-12 w-12 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                  useSampleData
+                    ? 'border-muted bg-muted/20 cursor-not-allowed opacity-50'
+                    : isDragOver 
+                    ? 'border-primary bg-primary/10 cursor-pointer' 
+                    : uploadedFile
+                    ? 'border-green-500 bg-green-50 dark:bg-green-950 cursor-pointer'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer'
+                }`}
+                onDrop={useSampleData ? undefined : handleDrop}
+                onDragOver={useSampleData ? undefined : handleDragOver}
+                onDragLeave={useSampleData ? undefined : handleDragLeave}
               >
-                {uploadMutation.isPending ? (
-                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                ) : uploadedFile ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                ) : uploadMutation.isError ? (
-                  <AlertCircle className="h-5 w-5 text-red-500" />
-                ) : (
-                  <Upload className={`h-5 w-5 ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} />
-                )}
-              </label>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload-square"
+                  disabled={useSampleData}
+                />
+                <label 
+                  htmlFor="file-upload-square" 
+                  className={`absolute inset-0 flex items-center justify-center ${useSampleData ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  {uploadMutation.isPending ? (
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  ) : uploadedFile ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : uploadMutation.isError ? (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <Upload className={`h-5 w-5 ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`} />
+                  )}
+                </label>
+              </div>
+              
+              {/* Drop CSV Text */}
+              <div className={`text-sm ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
+                <p>{useSampleData ? 'Upload disabled' : 'Drop CSV or click to upload'}</p>
+                <p className="text-xs">{useSampleData ? 'Toggle sample data off' : 'Max 50MB'}</p>
+              </div>
             </div>
-            
-            {/* Drop CSV Text */}
-            <div className={`text-sm ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-              <p>{useSampleData ? 'Upload disabled' : 'Drop CSV or click to upload'}</p>
-              <p className="text-xs">{useSampleData ? 'Toggle sample data off' : 'Max 50MB'}</p>
+
+            {/* Right Side - Process Button */}
+            <div className="flex items-center">
+              <Button 
+                size="sm" 
+                className="gap-1"
+                onClick={handleProcessData}
+                disabled={uploadMutation.isPending || (!uploadedFile && !useSampleData)}
+              >
+                <Play className="h-3 w-3" />
+                {uploadMutation.isPending ? 'Processing...' : 'Process'}
+              </Button>
             </div>
           </div>
 
-          {/* Center - Sample Data Toggle */}
-          <div className="flex items-center gap-2">
-            <Label htmlFor="sample-data-toggle" className="text-sm font-medium">
-              Sample Data
-            </Label>
-            <Switch
-              id="sample-data-toggle"
-              checked={useSampleData}
-              onCheckedChange={handleSampleDataToggle}
-            />
-          </div>
+          {/* Second Line - Sample Data Toggle + Parameters + Data Format */}
+          <div className="flex items-center justify-between">
+            {/* Left Side - Sample Data Toggle */}
+            <div className="flex items-center gap-2">
+              <Label htmlFor="sample-data-toggle" className="text-sm font-medium">
+                Sample Data
+              </Label>
+              <Switch
+                id="sample-data-toggle"
+                checked={useSampleData}
+                onCheckedChange={handleSampleDataToggle}
+              />
+            </div>
 
-          {/* Right Side - Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="gap-1 text-muted-foreground hover:text-foreground"
-              onClick={() => setIsDataFormatExpanded(!isDataFormatExpanded)}
-            >
-              <Info className="h-3 w-3" />
-              Data Format
-              <ChevronDown className={`h-3 w-3 transition-transform ${isDataFormatExpanded ? 'rotate-180' : ''}`} />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="gap-1"
-              onClick={() => setIsParametersExpanded(!isParametersExpanded)}
-            >
-              <Settings className="h-3 w-3" />
-              Parameters
-              <ChevronDown className={`h-3 w-3 transition-transform ${isParametersExpanded ? 'rotate-180' : ''}`} />
-            </Button>
+            {/* Right Side - Action Buttons */}
+            <div className="flex items-center gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="gap-1"
+                onClick={() => setIsParametersExpanded(!isParametersExpanded)}
+              >
+                <Settings className="h-3 w-3" />
+                Parameters
+                <ChevronDown className={`h-3 w-3 transition-transform ${isParametersExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="gap-1 text-muted-foreground hover:text-foreground"
+                onClick={() => setIsDataFormatExpanded(!isDataFormatExpanded)}
+              >
+                <Info className="h-3 w-3" />
+                Data Format
+                <ChevronDown className={`h-3 w-3 transition-transform ${isDataFormatExpanded ? 'rotate-180' : ''}`} />
+              </Button>
+            </div>
           </div>
         </div>
 
