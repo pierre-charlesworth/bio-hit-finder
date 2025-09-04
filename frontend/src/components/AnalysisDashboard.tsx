@@ -6,6 +6,7 @@ import { useAnalysis } from '@/contexts/AnalysisContext';
 import { useAnalysisDefaults } from '@/hooks/useApi';
 import SankeyDiagram from '@/components/SankeyDiagram';
 import ChartsGrid from '@/components/visualizations/charts/ChartsGrid';
+import HeatmapDashboard from '@/components/visualizations/heatmaps/HeatmapDashboard';
 
 const AnalysisDashboard = () => {
   const { currentAnalysis, isAnalyzing } = useAnalysis();
@@ -173,6 +174,15 @@ const AnalysisDashboard = () => {
             <ChartsGrid 
               analysisData={currentAnalysis!}
               zScoreThreshold={config.z_score_threshold}
+            />
+          </div>
+        )}
+
+        {/* Plate Heatmaps */}
+        {results && (
+          <div className="mb-12">
+            <HeatmapDashboard 
+              analysisData={currentAnalysis!}
             />
           </div>
         )}
