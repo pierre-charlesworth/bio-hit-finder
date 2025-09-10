@@ -33,7 +33,10 @@
       "mcp__render__get_deploy",
       "mcp__render__list_logs",
       "Read(/Users/pierrecharlesworth/Downloads/**)",
-      "mcp__render__list_workspaces"
+      "mcp__render__list_workspaces",
+      "Read(/var/folders/b_/chynjp6j4sv3xf_jdhks29680000gn/T/TemporaryItems/NSIRD_screencaptureui_jw9sJZ/**)",
+      "mcp__shadcn__get_item_examples_from_registries",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useApiTest, useDemoAnalysis } from '@/hooks/useApi';
 import { useToast } from '@/hooks/use-toast';
 import { useAnalysis } from '@/contexts/AnalysisContext';
@@ -7,6 +8,7 @@ import { useAnalysis } from '@/contexts/AnalysisContext';
 const Hero = () => {
   const { data: apiTest, isLoading, isError } = useApiTest();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const demoMutation = useDemoAnalysis();
   const { setCurrentAnalysis, setIsAnalyzing, setAnalysisError } = useAnalysis();
 
@@ -86,6 +88,7 @@ const Hero = () => {
             <Button 
               size="lg" 
               className="group"
+              onClick={() => navigate('/analysis')}
             >
               Upload Data
               <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
