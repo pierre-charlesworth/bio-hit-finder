@@ -99,10 +99,11 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
       const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
       
       if (isExcel) {
-        // Show sheet selector for Excel files
+        // Show sheet selector for Excel files - don't enable processing yet
         setShowSheetSelector(true);
         onStatusChange?.('uploaded');
         onFileNameChange?.(file.name);
+        // Don't set process callback until sheet is selected
       } else {
         // For CSV files, proceed directly
         onStatusChange?.('uploaded');
@@ -129,10 +130,11 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
       const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
       
       if (isExcel) {
-        // Show sheet selector for Excel files
+        // Show sheet selector for Excel files - don't enable processing yet
         setShowSheetSelector(true);
         onStatusChange?.('uploaded');
         onFileNameChange?.(file.name);
+        // Don't set process callback until sheet is selected
       } else {
         // For CSV files, proceed directly
         onStatusChange?.('uploaded');
@@ -255,7 +257,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                 size="sm" 
                 className="gap-1"
                 onClick={handleProcessData}
-                disabled={(uploadMutation.isPending || demoMutation.isPending) || (!uploadedFile && !useSampleData)}
+                disabled={(uploadMutation.isPending || demoMutation.isPending) || (!uploadedFile && !useSampleData) || (uploadedFile && (uploadedFile.name.endsWith('.xlsx') || uploadedFile.name.endsWith('.xls')) && !selectedSheet)}
               >
                 <Play className="h-3 w-3" />
                 {(uploadMutation.isPending || demoMutation.isPending) ? 'Processing...' : 'Process'}
