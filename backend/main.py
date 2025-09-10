@@ -13,7 +13,7 @@ import pandas as pd
 import io
 import json
 
-from core.plate_processor import PlateProcessor
+from core.plate_processor import PlateProcessor, get_available_excel_sheets
 from analytics import (
     MultiStageHitCaller, 
     MultiStageConfig, 
@@ -55,12 +55,13 @@ async def test_endpoint():
 # Multi-stage Hit Calling Endpoints
 
 @app.post("/api/v1/analyze/multi-stage")
-async def analyze_multi_stage_hits(file: UploadFile = File(...), config: Optional[str] = None):
+async def analyze_multi_stage_hits(file: UploadFile = File(...), config: Optional[str] = None, sheet_name: Optional[str] = None):
     """Analyze uploaded plate data using multi-stage hit calling.
     
     Args:
         file: Excel/CSV file with plate data
         config: JSON string with analysis configuration (optional)
+        sheet_name: Excel sheet name to process (optional, uses first sheet if not specified)
     
     Returns:
         Dict with analysis results and hit summary
@@ -78,7 +79,10 @@ async def analyze_multi_stage_hits(file: UploadFile = File(...), config: Optiona
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.StringIO((await file.read()).decode('utf-8')))
         elif file.filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(await file.read()))
+            if sheet_name:
+                df = pd.read_excel(io.BytesIO(await file.read()), sheet_name=sheet_name)
+            else:
+                df = pd.read_excel(io.BytesIO(await file.read()))
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV or Excel files.")
         
@@ -107,12 +111,13 @@ async def analyze_multi_stage_hits(file: UploadFile = File(...), config: Optiona
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 @app.post("/api/v1/analyze/vitality")  
-async def analyze_vitality_only(file: UploadFile = File(...), config: Optional[str] = None):
+async def analyze_vitality_only(file: UploadFile = File(...), config: Optional[str] = None, sheet_name: Optional[str] = None):
     """Analyze vitality patterns only from uploaded plate data.
     
     Args:
         file: Excel/CSV file with OD measurements
         config: JSON string with vitality configuration (optional)
+        sheet_name: Excel sheet name to process (optional, uses first sheet if not specified)
         
     Returns:
         Dict with vitality analysis results
@@ -135,7 +140,10 @@ async def analyze_vitality_only(file: UploadFile = File(...), config: Optional[s
         if file.filename.endswith('.csv'):
             df = pd.read_csv(io.StringIO((await file.read()).decode('utf-8')))
         elif file.filename.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(io.BytesIO(await file.read()))
+            if sheet_name:
+                df = pd.read_excel(io.BytesIO(await file.read()), sheet_name=sheet_name)
+            else:
+                df = pd.read_excel(io.BytesIO(await file.read()))
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV or Excel files.")
         
@@ -335,6 +343,53 @@ async def get_funnel_data_from_results(file: UploadFile = File(...), config: Opt
     except Exception as e:
         logger.error(f"Funnel data extraction from file failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Funnel data extraction failed: {str(e)}")
+
+@app.post("/api/v1/upload/sheets")
+async def get_excel_sheets(file: UploadFile = File(...)):
+    """Get available sheet names from an uploaded Excel file.
+    
+    Args:
+        file: Excel file (.xlsx or .xls)
+        
+    Returns:
+        Dict with sheet names and basic file info
+    """
+    try:
+        # Validate file type
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
+        
+        # Save file temporarily to disk for processing
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_file_path = temp_file.name
+        
+        try:
+            # Get sheet names using the existing function
+            sheet_names = get_available_excel_sheets(temp_file_path)
+            
+            # Get basic file info
+            file_size = len(content)
+            
+            return {
+                "filename": file.filename,
+                "file_size": file_size,
+                "sheet_names": sheet_names,
+                "total_sheets": len(sheet_names),
+                "success": True
+            }
+            
+        finally:
+            # Clean up temporary file
+            os.unlink(temp_file_path)
+            
+    except Exception as e:
+        logger.error(f"Failed to read Excel sheets from {file.filename}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to read Excel file: {str(e)}")
 
 def _extract_funnel_data_from_analysis(results_df: pd.DataFrame, summary: Dict[str, Any]) -> Dict[str, Any]:
     """Extract funnel visualization data from multi-stage analysis results.

@@ -39,12 +39,15 @@ export const api = {
   // Test endpoint
   test: () => apiRequest<{ message: string }>('/v1/test'),
 
-  // File upload endpoints (to be implemented)
-  uploadFile: async (file: File) => {
+  // File upload endpoints
+  uploadFile: async (file: File, sheetName?: string) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (sheetName) {
+      formData.append('sheet_name', sheetName);
+    }
     
-    const response = await fetch(`${API_BASE_URL}/v1/upload`, {
+    const response = await fetch(`${API_BASE_URL}/v1/analyze/multi-stage`, {
       method: 'POST',
       body: formData,
     });
@@ -56,12 +59,32 @@ export const api = {
     return response.json();
   },
 
+  // Get Excel sheet names
+  getExcelSheets: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${API_BASE_URL}/v1/upload/sheets`, {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      throw new ApiError(response.status, 'Failed to read Excel sheets');
+    }
+    
+    return response.json();
+  },
+
   // Multi-stage analysis endpoints
-  analyzeMultiStage: async (file: File, config?: any) => {
+  analyzeMultiStage: async (file: File, config?: any, sheetName?: string) => {
     const formData = new FormData();
     formData.append('file', file);
     if (config) {
       formData.append('config', JSON.stringify(config));
+    }
+    if (sheetName) {
+      formData.append('sheet_name', sheetName);
     }
     
     const response = await fetch(`${API_BASE_URL}/v1/analyze/multi-stage`, {
@@ -76,11 +99,14 @@ export const api = {
     return response.json();
   },
 
-  analyzeVitality: async (file: File, config?: any) => {
+  analyzeVitality: async (file: File, config?: any, sheetName?: string) => {
     const formData = new FormData();
     formData.append('file', file);
     if (config) {
       formData.append('config', JSON.stringify(config));
+    }
+    if (sheetName) {
+      formData.append('sheet_name', sheetName);
     }
     
     const response = await fetch(`${API_BASE_URL}/v1/analyze/vitality`, {

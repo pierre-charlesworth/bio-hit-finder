@@ -8,6 +8,7 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Upload, 
   FileText, 
@@ -20,10 +21,12 @@ import {
   Info,
   FlaskConical,
   Activity,
-  Target
+  Target,
+  FileSpreadsheet
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAnalysis } from '@/contexts/AnalysisContext';
+import SheetSelector from './SheetSelector';
 
 interface DataUploadBarProps {
   onStatusChange?: (status: 'none' | 'uploaded' | 'sample' | 'processing' | 'error') => void;
@@ -37,6 +40,8 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
   const [isDataFormatExpanded, setIsDataFormatExpanded] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [useSampleData, setUseSampleData] = useState(false);
+  const [showSheetSelector, setShowSheetSelector] = useState(false);
+  const [selectedSheet, setSelectedSheet] = useState<string>('');
   
   const { setCurrentAnalysis } = useAnalysis();
   
@@ -47,15 +52,17 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
   const [edgeEffectThreshold, setEdgeEffectThreshold] = useState(0.1);
 
   const uploadMutation = useMutation({
-    mutationFn: api.uploadFile,
+    mutationFn: ({ file, sheetName }: { file: File; sheetName?: string }) => api.uploadFile(file, sheetName),
     onSuccess: (data) => {
       console.log('Upload successful:', data);
       setCurrentAnalysis(data);
       onStatusChange?.('uploaded');
+      setShowSheetSelector(false);
     },
     onError: (error) => {
       console.error('Upload failed:', error);
       setUploadedFile(null);
+      setShowSheetSelector(false);
       onStatusChange?.('error');
     },
   });
@@ -86,9 +93,22 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     const file = event.target.files?.[0];
     if (file) {
       setUploadedFile(file);
-      onStatusChange?.('uploaded');
-      onFileNameChange?.(file.name);
-      onProcessCallbackChange?.(() => handleProcessData);
+      setSelectedSheet('');
+      
+      // Check if it's an Excel file
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      
+      if (isExcel) {
+        // Show sheet selector for Excel files
+        setShowSheetSelector(true);
+        onStatusChange?.('uploaded');
+        onFileNameChange?.(file.name);
+      } else {
+        // For CSV files, proceed directly
+        onStatusChange?.('uploaded');
+        onFileNameChange?.(file.name);
+        onProcessCallbackChange?.(() => handleProcessData);
+      }
     }
   };
 
@@ -96,11 +116,29 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
     event.preventDefault();
     setIsDragOver(false);
     const file = event.dataTransfer.files?.[0];
-    if (file && file.type === 'text/csv') {
+    
+    if (file && (file.type === 'text/csv' || 
+        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.type === 'application/vnd.ms-excel' ||
+        file.name.endsWith('.csv') || file.name.endsWith('.xlsx') || file.name.endsWith('.xls'))) {
+      
       setUploadedFile(file);
-      onStatusChange?.('uploaded');
-      onFileNameChange?.(file.name);
-      onProcessCallbackChange?.(() => handleProcessData);
+      setSelectedSheet('');
+      
+      // Check if it's an Excel file
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      
+      if (isExcel) {
+        // Show sheet selector for Excel files
+        setShowSheetSelector(true);
+        onStatusChange?.('uploaded');
+        onFileNameChange?.(file.name);
+      } else {
+        // For CSV files, proceed directly
+        onStatusChange?.('uploaded');
+        onFileNameChange?.(file.name);
+        onProcessCallbackChange?.(() => handleProcessData);
+      }
     }
   };
 
@@ -117,12 +155,26 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
   const handleProcessData = () => {
     onStatusChange?.('processing');
     if (uploadedFile) {
-      uploadMutation.mutate(uploadedFile);
+      uploadMutation.mutate({ file: uploadedFile, sheetName: selectedSheet });
     } else if (useSampleData) {
       // Process sample data using demo endpoint
       console.log('Processing sample data...');
       demoMutation.mutate();
     }
+  };
+
+  const handleSheetSelected = (sheetName: string) => {
+    setSelectedSheet(sheetName);
+    setShowSheetSelector(false);
+    onProcessCallbackChange?.(() => handleProcessData);
+  };
+
+  const handleSheetSelectorClose = () => {
+    setShowSheetSelector(false);
+    setUploadedFile(null);
+    onStatusChange?.('none');
+    onFileNameChange?.('');
+    onProcessCallbackChange?.(null);
   };
 
   const handleSampleDataToggle = () => {
@@ -168,7 +220,7 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
               >
                 <input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={handleFileUpload}
                   className="hidden"
                   id="file-upload-square"
@@ -190,10 +242,10 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
                 </label>
               </div>
               
-              {/* Drop CSV Text */}
+              {/* Drop Files Text */}
               <div className={`text-sm ${useSampleData ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
-                <p>{useSampleData ? 'Upload disabled' : 'Drop CSV or click to upload'}</p>
-                <p className="text-xs">{useSampleData ? 'Toggle sample data off' : 'Max 50MB'}</p>
+                <p>{useSampleData ? 'Upload disabled' : 'Drop CSV/Excel or click to upload'}</p>
+                <p className="text-xs">{useSampleData ? 'Toggle sample data off' : 'Supports .csv, .xlsx, .xls • Max 50MB'}</p>
               </div>
             </div>
 
@@ -523,6 +575,25 @@ const DataUploadBar = ({ onStatusChange, onFileNameChange, onProcessCallbackChan
           </CollapsibleContent>
         </Collapsible>
       </div>
+
+      {/* Sheet Selector Dialog */}
+      <Dialog open={showSheetSelector} onOpenChange={setShowSheetSelector}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Excel Sheet Selection
+            </DialogTitle>
+          </DialogHeader>
+          {uploadedFile && (
+            <SheetSelector
+              file={uploadedFile}
+              onSheetSelected={handleSheetSelected}
+              onClose={handleSheetSelectorClose}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
