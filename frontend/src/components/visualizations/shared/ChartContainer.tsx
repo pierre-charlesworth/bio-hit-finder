@@ -256,11 +256,11 @@ const ChartContainer = ({
       </CardHeader>
 
       <CardContent className="pt-0">
-        <div 
-          className="w-full"
-          style={{ 
-            height: height || (isExpanded ? 'calc(100vh - 200px)' : '400px'),
-            minHeight: '300px'
+        <div
+          className="w-full overflow-hidden"
+          style={{
+            height: height ? `${height}px` : (isExpanded ? 'calc(100vh - 200px)' : '400px'),
+            minHeight: height ? `${height}px` : '300px'
           }}
         >
           {children}

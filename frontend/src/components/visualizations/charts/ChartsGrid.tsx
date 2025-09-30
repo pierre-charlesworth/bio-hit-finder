@@ -7,8 +7,9 @@ import { BarChart3, TrendingUp, Activity, Download, Settings } from 'lucide-reac
 import { AnalysisResult } from '@/types/analysis';
 
 import HistogramChart from './HistogramChart';
-import ScatterChart from './ScatterChart';  
+import ScatterChart from './ScatterChart';
 import BarChart from './BarChart';
+import Plate3DChart from './Plate3DChart';
 
 interface ChartsGridProps {
   analysisData: AnalysisResult;
@@ -117,57 +118,76 @@ const ChartsGrid = ({
 
       {/* Chart content */}
       {selectedView === 'grid' ? (
-        /* Grid Layout (2x2) */
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Z_lptA Histogram */}
-          <HistogramChart
+        /* Grid Layout */
+        <div className="space-y-6">
+          {/* 3D Plate Visualization - Full Width */}
+          <Plate3DChart
             analysisData={analysisData}
-            column="Z_lptA"
-            title="Z-Score Distribution (lptA)"
-            description="σE-regulated reporter for LPS transport disruption"
-            color="#3B82F6" // blue
-            threshold={zScoreThreshold}
-            showThresholds={true}
-            onExport={(format) => handleChartExport('Z_lptA_histogram', format)}
+            dataColumn="Z_lptA"
+            title="3D Plate View - Z-Score (lptA)"
+            description="Spatial visualization of well intensities across the plate for edge effects and QC"
+            colorScale="Viridis"
+            showColorbar={true}
+            onExport={(format) => handleChartExport('plate_3d_view', format)}
+            height={700}
           />
 
-          {/* Z_ldtD Histogram */}
-          <HistogramChart
-            analysisData={analysisData}
-            column="Z_ldtD"
-            title="Z-Score Distribution (ldtD)"
-            description="Cpx-regulated reporter for peptidoglycan stress"
-            color="#059669" // emerald
-            threshold={zScoreThreshold}
-            showThresholds={true}
-            onExport={(format) => handleChartExport('Z_ldtD_histogram', format)}
-          />
+          {/* Standard Charts Grid (2x2) */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Z_lptA Histogram */}
+            <HistogramChart
+              analysisData={analysisData}
+              column="Z_lptA"
+              title="Z-Score Distribution (lptA)"
+              description="σE-regulated reporter for LPS transport disruption"
+              color="#3B82F6" // blue
+              threshold={zScoreThreshold}
+              showThresholds={true}
+              onExport={(format) => handleChartExport('Z_lptA_histogram', format)}
+            />
 
-          {/* Ratio Correlation Scatter */}
-          <ScatterChart
-            analysisData={analysisData}
-            xColumn="Ratio_lptA"
-            yColumn="Ratio_ldtD"
-            colorColumn="PlateID"
-            title="Reporter Correlation"
-            description="Dual-reporter correlation analysis by plate"
-            showTrendline={true}
-            onExport={(format) => handleChartExport('ratio_correlation', format)}
-          />
+            {/* Z_ldtD Histogram */}
+            <HistogramChart
+              analysisData={analysisData}
+              column="Z_ldtD"
+              title="Z-Score Distribution (ldtD)"
+              description="Cpx-regulated reporter for peptidoglycan stress"
+              color="#059669" // emerald
+              threshold={zScoreThreshold}
+              showThresholds={true}
+              onExport={(format) => handleChartExport('Z_ldtD_histogram', format)}
+            />
 
-          {/* Viability Bar Chart */}
-          <BarChart
-            analysisData={analysisData}
-            title="Viability by Plate"
-            description="ATP-based viability assessment for quality control"
-            showPercentages={false}
-            onExport={(format) => handleChartExport('viability_bars', format)}
-          />
+            {/* Ratio Correlation Scatter */}
+            <ScatterChart
+              analysisData={analysisData}
+              xColumn="Ratio_lptA"
+              yColumn="Ratio_ldtD"
+              colorColumn="PlateID"
+              title="Reporter Correlation"
+              description="Dual-reporter correlation analysis by plate"
+              showTrendline={true}
+              onExport={(format) => handleChartExport('ratio_correlation', format)}
+            />
+
+            {/* Viability Bar Chart */}
+            <BarChart
+              analysisData={analysisData}
+              title="Viability by Plate"
+              description="ATP-based viability assessment for quality control"
+              showPercentages={false}
+              onExport={(format) => handleChartExport('viability_bars', format)}
+            />
+          </div>
         </div>
       ) : (
         /* Tabbed Layout */
-        <Tabs defaultValue="distributions" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="plate3d" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="plate3d" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              3D Plate
+            </TabsTrigger>
             <TabsTrigger value="distributions" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Distributions
@@ -181,6 +201,19 @@ const ChartsGrid = ({
               Quality Control
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="plate3d" className="mt-6">
+            <Plate3DChart
+              analysisData={analysisData}
+              dataColumn="Z_lptA"
+              title="3D Plate View - Z-Score (lptA)"
+              description="Spatial visualization showing well intensities in their physical grid positions for QC and edge effect detection"
+              colorScale="Viridis"
+              showColorbar={true}
+              height={700}
+              onExport={(format) => handleChartExport('plate_3d_view', format)}
+            />
+          </TabsContent>
 
           <TabsContent value="distributions" className="space-y-6 mt-6">
             <div className="grid md:grid-cols-2 gap-6">
