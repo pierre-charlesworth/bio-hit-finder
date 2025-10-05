@@ -278,7 +278,7 @@ const PlateHeatmap = ({
 
         {/* Wells */}
         <g className="wells">
-          {plateLayout.wells.map((well) => {
+          {plateLayout.wells.map((well, index) => {
             const wellData = wellDataMap.get(well.wellId);
             if (!wellData) return null;
 
@@ -288,7 +288,7 @@ const PlateHeatmap = ({
             const isViable = wellData.PassViab;
 
             return (
-              <g key={well.wellId}>
+              <g key={`${wellData.PlateID}-${well.wellId}-${index}`}>
                 {/* Well background */}
                 <circle
                   cx={well.x}

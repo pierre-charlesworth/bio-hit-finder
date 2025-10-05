@@ -471,8 +471,11 @@ function extractFamilyInfo(plateId: string, wells: WellData[]): { family?: strin
     /^([A-Z]+)(\d+)$/               // FAMILY001
   ];
 
+  // Convert plateId to string if it's a number
+  const plateIdStr = String(plateId);
+
   for (const pattern of patterns) {
-    const match = plateId.match(pattern);
+    const match = plateIdStr.match(pattern);
     if (match) {
       return {
         family: match[1],

@@ -196,27 +196,30 @@ const TooltipField = ({ label, value, format }: TooltipFieldProps) => (
 /**
  * Formats values based on data type
  */
-function formatValue(value: number, dataType: string): string {
-  if (!isFinite(value)) {
+function formatValue(value: number | string | null | undefined, dataType: string): string {
+  // Convert to number and validate
+  const numValue = typeof value === 'number' ? value : parseFloat(String(value));
+
+  if (!isFinite(numValue) || value === '' || value === null || value === undefined) {
     return 'N/A';
   }
 
   const lowerType = dataType.toLowerCase();
 
   if (lowerType.includes('ratio')) {
-    return value.toFixed(3);
+    return numValue.toFixed(3);
   } else if (lowerType.includes('viab') || lowerType.includes('percentage')) {
-    return `${(value * 100).toFixed(1)}%`;
+    return `${(numValue * 100).toFixed(1)}%`;
   } else if (lowerType.includes('z_score') || lowerType.includes('b_score')) {
-    return value.toFixed(2);
+    return numValue.toFixed(2);
   } else {
     // Auto-format based on magnitude
-    if (Math.abs(value) >= 100) {
-      return value.toFixed(0);
-    } else if (Math.abs(value) >= 10) {
-      return value.toFixed(1);
+    if (Math.abs(numValue) >= 100) {
+      return numValue.toFixed(0);
+    } else if (Math.abs(numValue) >= 10) {
+      return numValue.toFixed(1);
     } else {
-      return value.toFixed(2);
+      return numValue.toFixed(2);
     }
   }
 }

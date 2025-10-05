@@ -88,22 +88,77 @@ async def analyze_multi_stage_hits(file: UploadFile = File(...), config: Optiona
         
         # Initialize plate processor
         processor = PlateProcessor()
-        
-        # Process the plate data (this includes our new multi-stage hit calling)
-        processed_df = processor.process_plate(df, plate_id="uploaded_plate", config=analysis_config)
-        
-        # Generate summary statistics
-        summary = _generate_multi_stage_summary(processed_df)
-        
-        # Convert DataFrame to JSON-serializable format
+
+        logger.info(f"Input DataFrame columns: {df.columns.tolist()}")
+        logger.info(f"Input DataFrame shape: {df.shape}")
+
+        # Process the plate data using the correct method name
+        processed_df = processor.process_single_plate(df, plate_id="uploaded_plate")
+
+        logger.info(f"Processed DataFrame columns: {processed_df.columns.tolist()}")
+        logger.info(f"Processed DataFrame shape: {processed_df.shape}")
+        logger.info(f"Sample processed row: {processed_df.iloc[0].to_dict()}")
+
+        # Add PassViab column if not present (combine viability flags)
+        if 'PassViab' not in processed_df.columns:
+            if 'viability_ok_lptA' in processed_df.columns and 'viability_ok_ldtD' in processed_df.columns:
+                # Well passes viability if either reporter passes
+                processed_df['PassViab'] = processed_df['viability_ok_lptA'] | processed_df['viability_ok_ldtD']
+            elif 'viability_ok_lptA' in processed_df.columns:
+                processed_df['PassViab'] = processed_df['viability_ok_lptA']
+            elif 'viability_ok_ldtD' in processed_df.columns:
+                processed_df['PassViab'] = processed_df['viability_ok_ldtD']
+            else:
+                # Default to all True if no viability columns found
+                processed_df['PassViab'] = True
+            logger.info(f"Added PassViab column: {processed_df['PassViab'].sum()} viable wells")
+
+        # Convert dict config to MultiStageConfig object
+        multi_config = MultiStageConfig()
+        if analysis_config:
+            multi_config.z_threshold = analysis_config.get('z_threshold', 2.0)
+            multi_config.viability_column = analysis_config.get('viability_column', 'PassViab')
+            multi_config.require_both_stages = analysis_config.get('require_both_stages', True)
+
+            # Handle vitality config
+            if 'vitality_config' in analysis_config:
+                vitality_data = analysis_config['vitality_config']
+                multi_config.vitality_config = VitalityConfig(
+                    tolc_threshold=vitality_data.get('tolc_threshold', 0.8),
+                    wt_threshold=vitality_data.get('wt_threshold', 0.8),
+                    sa_threshold=vitality_data.get('sa_threshold', 0.8)
+                )
+
+        # Run multi-stage hit calling analysis
+        processed_df, summary = run_multi_stage_analysis(processed_df, multi_config)
+
+        logger.info(f"Multi-stage analysis complete. Summary: {summary}")
+
+        # Convert DataFrame to JSON-serializable format, handling NaN values
+        processed_df = processed_df.fillna('')  # Replace NaN with empty string for JSON serialization
         results = processed_df.to_dict(orient='records')
-        
+
+        # Convert numpy types to Python native types for JSON serialization
+        def convert_numpy_types(obj):
+            if isinstance(obj, dict):
+                return {k: convert_numpy_types(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            elif hasattr(obj, 'item'):  # numpy scalar
+                return obj.item()
+            else:
+                return obj
+
+        summary = convert_numpy_types(summary)
+        results = convert_numpy_types(results)
+
         return {
             "success": True,
             "results": results,
             "summary": summary,
             "total_wells": len(processed_df),
-            "file_name": file.filename
+            "file_name": file.filename,
+            "analysis_type": "multi-stage"
         }
         
     except Exception as e:

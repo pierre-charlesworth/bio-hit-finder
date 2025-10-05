@@ -313,7 +313,7 @@ const ZScoreComparisonChart = ({
         layout={layout}
         height={height}
         loading={!chartData}
-        error={warnings.length > 0 ? warnings[0] : null}
+        error={null}
       />
     </ChartContainer>
   );

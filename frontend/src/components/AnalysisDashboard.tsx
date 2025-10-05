@@ -1,28 +1,30 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BarChart3, TrendingUp, AlertTriangle, Download, Eye, Loader2, Filter } from 'lucide-react';
 import { useAnalysis } from '@/contexts/AnalysisContext';
 import { useAnalysisDefaults } from '@/hooks/useApi';
 import SankeyDiagram from '@/components/SankeyDiagram';
 import ChartsGrid from '@/components/visualizations/charts/ChartsGrid';
 import HeatmapDashboard from '@/components/visualizations/heatmaps/HeatmapDashboard';
+import DataTable from '@/components/DataTable';
 
 const AnalysisDashboard = () => {
-  const { currentAnalysis, isAnalyzing } = useAnalysis();
+  const { filteredAnalysis, selectedPlateId, availablePlates, setSelectedPlateId, isAnalyzing } = useAnalysis();
   const { data: analysisDefaults, isLoading: configLoading } = useAnalysisDefaults();
 
-  // Calculate actual results from analysis data
-  const results = currentAnalysis ? {
-    totalWells: currentAnalysis.total_wells,
-    platformHits: currentAnalysis.summary?.stage3_platform_hits || 0,
-    reporterHits: currentAnalysis.summary?.stage1_reporter_hits || 0,
-    vitalityHits: currentAnalysis.summary?.stage2_vitality_hits || 0,
-    platformHitRate: currentAnalysis.summary?.stage3_platform_hit_rate || 0,
-    reporterHitRate: currentAnalysis.summary?.stage1_reporter_hit_rate || 0,
-    vitalityHitRate: currentAnalysis.summary?.stage2_vitality_hit_rate || 0,
-    analysisType: currentAnalysis.analysis_type || 'multi-stage',
-    fileName: currentAnalysis.file_name || 'Demo Data'
+  // Calculate actual results from filtered analysis data
+  const results = filteredAnalysis ? {
+    totalWells: filteredAnalysis.total_wells,
+    platformHits: filteredAnalysis.summary?.stage3_platform_hits || 0,
+    reporterHits: filteredAnalysis.summary?.stage1_reporter_hits || 0,
+    vitalityHits: filteredAnalysis.summary?.stage2_vitality_hits || 0,
+    platformHitRate: filteredAnalysis.summary?.stage3_platform_hit_rate || 0,
+    reporterHitRate: filteredAnalysis.summary?.stage1_reporter_hit_rate || 0,
+    vitalityHitRate: filteredAnalysis.summary?.stage2_vitality_hit_rate || 0,
+    analysisType: filteredAnalysis.analysis_type || 'multi-stage',
+    fileName: filteredAnalysis.file_name || 'Demo Data'
   } : null;
 
   // Use config defaults for thresholds
@@ -37,7 +39,7 @@ const AnalysisDashboard = () => {
     <section className="py-24 px-6">
       <div className="max-w-6xl mx-auto">
         {(results || isAnalyzing) && (
-          <div className="text-center mb-16">
+          <div className="text-center mb-8">
             <p className="text-muted-foreground max-w-2xl mx-auto">
               {results ? `Results from ${results.fileName}` : 'Run demo or upload data to see analysis results'}
             </p>
@@ -47,6 +49,39 @@ const AnalysisDashboard = () => {
                 <span className="text-sm text-muted-foreground">Analyzing...</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Plate Selector */}
+        {availablePlates.length > 1 && results && (
+          <div className="flex justify-center mb-8">
+            <Card className="w-full max-w-md">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Select value={selectedPlateId} onValueChange={setSelectedPlateId}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select plate to filter" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Plates ({availablePlates.length})</SelectItem>
+                        {availablePlates.map((plateId) => (
+                          <SelectItem key={plateId} value={plateId}>
+                            {plateId}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {selectedPlateId !== 'all' && (
+                    <Badge variant="outline" className="text-xs">
+                      Filtered
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -87,7 +122,7 @@ const AnalysisDashboard = () => {
         {/* Pipeline Sankey Diagram */}
         {results && (
           <div className="mb-12">
-            <SankeyDiagram analysisData={currentAnalysis!} />
+            <SankeyDiagram analysisData={filteredAnalysis!} />
           </div>
         )}
 
@@ -171,8 +206,8 @@ const AnalysisDashboard = () => {
         {/* Statistical Visualizations */}
         {results && (
           <div className="mb-12">
-            <ChartsGrid 
-              analysisData={currentAnalysis!}
+            <ChartsGrid
+              analysisData={filteredAnalysis!}
               zScoreThreshold={config.z_score_threshold}
             />
           </div>
@@ -181,9 +216,16 @@ const AnalysisDashboard = () => {
         {/* Plate Heatmaps */}
         {results && (
           <div className="mb-12">
-            <HeatmapDashboard 
-              analysisData={currentAnalysis!}
+            <HeatmapDashboard
+              analysisData={filteredAnalysis!}
             />
+          </div>
+        )}
+
+        {/* Data Table */}
+        {results && (
+          <div className="mb-12">
+            <DataTable analysisData={filteredAnalysis!} />
           </div>
         )}
 

@@ -82,11 +82,12 @@ class MultiStageHitCaller:
         self.vitality_analyzer = VitalityAnalyzer(self.config.vitality_config)
         
     def stage1_reporter_hits(self, df: pd.DataFrame, config: Optional[MultiStageConfig] = None) -> pd.DataFrame:
-        """Identify Stage 1 reporter hits based on Z-scores and viability.
-        
+        """Identify Stage 1 reporter hits based on Z-scores only.
+
         Reporter hits are defined as wells with:
-        - Z-score ≥ threshold for any reporter gene AND
-        - PassViab = True (viable)
+        - Z-score ≥ threshold for any reporter gene
+
+        Note: PassViab is added as a QC warning flag but does not filter hits
         
         Args:
             df: DataFrame with Z-score columns and viability flags
@@ -106,31 +107,32 @@ class MultiStageHitCaller:
         for col in config.reporter_columns:
             if col not in df_result.columns:
                 missing_cols.append(col)
-        if config.viability_column not in df_result.columns:
-            missing_cols.append(config.viability_column)
-            
+
         if missing_cols:
             raise MultiStageError(f"Missing required columns for Stage 1: {missing_cols}")
-            
+
         # Calculate reporter hits for each gene
         reporter_hits = pd.DataFrame(index=df_result.index)
-        
+
         for col in config.reporter_columns:
             gene_name = col.replace('Z_', '')  # Extract gene name (lptA, ldtD, etc.)
             hit_col = f'{gene_name}_ReporterHit'
-            
-            # Z-score threshold AND viability requirement
-            reporter_hits[hit_col] = (
-                (df_result[col] >= config.z_threshold) & 
-                (df_result[config.viability_column] == True)
-            )
-            
+
+            # Z-score threshold only (viability is QC flag, not a filter)
+            reporter_hits[hit_col] = (df_result[col] >= config.z_threshold)
+
             # Add Z-score information for hits
             df_result[f'{gene_name}_ZScore'] = df_result[col]
             df_result[hit_col] = reporter_hits[hit_col]
-        
+
         # Stage 1 overall hit: any reporter hit
         df_result['Stage1_ReporterHit'] = reporter_hits.any(axis=1)
+
+        # Add viability QC flag if column exists (for warning purposes only)
+        if config.viability_column in df_result.columns:
+            df_result['Stage1_ViabilityWarning'] = ~df_result[config.viability_column]
+        else:
+            df_result['Stage1_ViabilityWarning'] = False
         
         # Add summary columns
         df_result['Stage1_HitCount'] = reporter_hits.sum(axis=1)

@@ -249,7 +249,7 @@ const BarChart = ({
         layout={layout}
         height={height}
         loading={!viabilityData || viabilityData.length === 0}
-        error={qualityWarnings.length > 0 ? qualityWarnings[0] : null}
+        error={null}
       />
     </ChartContainer>
   );

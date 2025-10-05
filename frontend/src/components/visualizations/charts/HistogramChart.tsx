@@ -213,7 +213,7 @@ const HistogramChart = ({
         layout={layout}
         height={height}
         loading={!plotData.values || plotData.values.length === 0}
-        error={warnings.length > 0 ? warnings[0] : null}
+        error={null}
       />
     </ChartContainer>
   );

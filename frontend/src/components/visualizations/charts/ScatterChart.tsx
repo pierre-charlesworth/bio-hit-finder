@@ -233,7 +233,7 @@ const ScatterChart = ({
         layout={layout}
         height={height}
         loading={!plotData.x || plotData.x.length === 0}
-        error={warnings.length > 0 ? warnings[0] : null}
+        error={null}
       />
     </ChartContainer>
   );

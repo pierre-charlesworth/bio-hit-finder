@@ -90,9 +90,13 @@ export class DataProcessor {
    */
   static extractWellData(analysisData: AnalysisResult): WellData[] {
     if (!analysisData?.results || !Array.isArray(analysisData.results)) {
+      console.warn('No results in analysisData:', analysisData);
       return [];
     }
-    
+
+    console.log('Extracting well data. Sample well:', analysisData.results[0]);
+    console.log(`Total wells in results: ${analysisData.results.length}`);
+
     return analysisData.results as WellData[];
   }
 

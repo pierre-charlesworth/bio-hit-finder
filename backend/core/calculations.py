@@ -153,24 +153,27 @@ def calculate_od_normalization(df: pd.DataFrame) -> pd.DataFrame:
     return result_df
 
 
-def calculate_robust_zscore_columns(df: pd.DataFrame, 
-                                   columns: Optional[list[str]] = None) -> pd.DataFrame:
+def calculate_robust_zscore_columns(df: pd.DataFrame,
+                                   columns: Optional[list[str]] = None,
+                                   per_plate: bool = True) -> pd.DataFrame:
     """Calculate robust Z-scores for specified columns using PRD Section 4.3 formula.
-    
+
     Formula: Z = (value - median(values)) / (1.4826 * MAD(values))
     where MAD = median(|X - median(X)|)
-    
+
     Args:
         df: DataFrame containing columns to calculate Z-scores for
         columns: List of column names to calculate Z-scores for.
                 If None, defaults to ['Ratio_lptA', 'Ratio_ldtD']
-        
+        per_plate: If True, calculate median/MAD separately for each PlateID.
+                  If False, calculate across all data.
+
     Returns:
         DataFrame with original columns plus Z-score columns (prefixed with 'Z_')
-        
+
     Raises:
         ValueError: If any specified columns are missing
-        
+
     Examples:
         >>> df = pd.DataFrame({
         ...     'Ratio_lptA': [1.0, 2.0, 3.0, 4.0, 5.0],
@@ -179,36 +182,64 @@ def calculate_robust_zscore_columns(df: pd.DataFrame,
         >>> result = calculate_robust_zscore_columns(df)
         >>> 'Z_lptA' in result.columns
         True
-        >>> 'Z_ldtD' in result.columns  
+        >>> 'Z_ldtD' in result.columns
         True
     """
     logger.debug("Calculating robust Z-scores for columns")
-    
+
     # Default columns if not specified
     if columns is None:
         columns = ['Ratio_lptA', 'Ratio_ldtD']
-    
+
     # Validate columns exist
     missing_columns = [col for col in columns if col not in df.columns]
     if missing_columns:
         raise ValueError(f"Missing columns for Z-score calculation: {missing_columns}")
-    
+
     # Create a copy to avoid modifying original DataFrame
     result_df = df.copy()
-    
-    # Calculate Z-scores for each specified column
-    for col in columns:
-        z_col = f"Z_{col.replace('Ratio_', '')}"  # Z_lptA, Z_ldtD
-        
-        # Calculate robust Z-scores
-        z_scores = calculate_robust_zscore(result_df[col])
-        result_df[z_col] = z_scores
-        
-        # Log statistics
-        valid_count = np.sum(~np.isnan(z_scores))
-        total_count = len(z_scores)
-        logger.info(f"Calculated {z_col}: {valid_count}/{total_count} valid Z-scores")
-    
+
+    # Check if we should calculate per-plate
+    has_plate_id = 'PlateID' in result_df.columns and per_plate
+
+    if has_plate_id:
+        # Calculate Z-scores per plate
+        logger.info("Calculating Z-scores per plate (grouped by PlateID)")
+
+        for col in columns:
+            z_col = f"Z_{col.replace('Ratio_', '')}"  # Z_lptA, Z_ldtD
+
+            # Initialize Z-score column with NaN
+            result_df[z_col] = np.nan
+
+            # Calculate Z-scores for each plate separately
+            for plate_id in result_df['PlateID'].unique():
+                plate_mask = result_df['PlateID'] == plate_id
+                plate_values = result_df.loc[plate_mask, col]
+
+                # Calculate Z-scores for this plate
+                plate_z_scores = calculate_robust_zscore(plate_values)
+                result_df.loc[plate_mask, z_col] = plate_z_scores
+
+                # Log per-plate statistics
+                valid_count = np.sum(~np.isnan(plate_z_scores))
+                logger.info(f"Plate {plate_id}: {z_col} {valid_count}/{len(plate_values)} valid Z-scores")
+    else:
+        # Calculate Z-scores across all data
+        logger.info("Calculating Z-scores across all data (not grouped by plate)")
+
+        for col in columns:
+            z_col = f"Z_{col.replace('Ratio_', '')}"  # Z_lptA, Z_ldtD
+
+            # Calculate robust Z-scores
+            z_scores = calculate_robust_zscore(result_df[col])
+            result_df[z_col] = z_scores
+
+            # Log statistics
+            valid_count = np.sum(~np.isnan(z_scores))
+            total_count = len(z_scores)
+            logger.info(f"Calculated {z_col}: {valid_count}/{total_count} valid Z-scores")
+
     return result_df
 
 
@@ -341,8 +372,8 @@ def process_plate_calculations(df: pd.DataFrame,
     # Step 2: Calculate OD normalization  
     processed_df = calculate_od_normalization(processed_df)
     
-    # Step 3: Calculate robust Z-scores for ratios
-    processed_df = calculate_robust_zscore_columns(processed_df, ['Ratio_lptA', 'Ratio_ldtD'])
+    # Step 3: Calculate robust Z-scores for ratios (per-plate calculation)
+    processed_df = calculate_robust_zscore_columns(processed_df, ['Ratio_lptA', 'Ratio_ldtD'], per_plate=True)
     
     # Step 4: Apply viability gating
     processed_df = apply_viability_gate(processed_df, f=viability_threshold)

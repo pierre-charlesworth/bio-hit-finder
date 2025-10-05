@@ -273,24 +273,24 @@ const ColorScaleLegend = ({
               <div>
                 <span className="text-muted-foreground">Range:</span>
                 <span className="font-medium ml-1">
-                  {statistics.min.toFixed(2)} – {statistics.max.toFixed(2)}
+                  {(statistics.min || 0).toFixed(2)} – {(statistics.max || 0).toFixed(2)}
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Mean:</span>
-                <span className="font-medium ml-1">{statistics.mean.toFixed(2)}</span>
+                <span className="font-medium ml-1">{(statistics.mean || 0).toFixed(2)}</span>
               </div>
               <div>
                 <span className="text-muted-foreground">Std:</span>
-                <span className="font-medium ml-1">{statistics.std.toFixed(2)}</span>
+                <span className="font-medium ml-1">{(statistics.std || 0).toFixed(2)}</span>
               </div>
             </div>
 
             {/* Percentiles */}
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Q1: {statistics.p25.toFixed(2)}</span>
-              <span>Median: {statistics.median.toFixed(2)}</span>
-              <span>Q3: {statistics.p75.toFixed(2)}</span>
+              <span>Q1: {(statistics.p25 || 0).toFixed(2)}</span>
+              <span>Median: {(statistics.median || 0).toFixed(2)}</span>
+              <span>Q3: {(statistics.p75 || 0).toFixed(2)}</span>
             </div>
           </div>
         )}
